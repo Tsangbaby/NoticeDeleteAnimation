@@ -17,6 +17,9 @@ Review found that successful prepare suppresses original animated, but finish ca
 
 Review corrections applied: keep probing for the entire bounded 60-second window despite partial readiness; per-hook installation flags prevent duplicate replacement. Fixed off-main diagnostic loss through a fixed-key synchronized accumulator with at most one pending 0.5s flush. Nil request and getter ABI/exception have distinct codes. Native UI/hook runtime validation is still required beyond syntax contracts and Core tests.
 
+## Native build iteration
+First alpha2 CI run 43571699420 compiled production Swift/ObjC and passed 20 Core tests, but failed linking the settings bundle: Xcode's public iOS18.5 SDK has no Preferences framework linker stub. This is a build-toolchain failure, not the user's device failure. Added unmodified official theos/sdks iOS16.5 Preferences.tbd pinned at 0222fd5413cf4b9af096f37b4621afa2688572f7 and SHA256 9daceaff6cf94346594a12f9ef9c2ea23de15475b516f9e33c20871a018c098b; Preferences subproject adds only that linker search directory. Production compilation still uses Xcode16.4/iOS18.5 with deployment15.0. Local non-CI builds must supply the equivalent stub via NDA_PRIVATE_FRAMEWORKS when absent from the SDK.
+
 ## Validation / independent failures
 - Native RootHide compile all production Swift/ObjC and Preferences bundle both slices; Core XCTest and source checks.
 - Missing Settings entry, no diagnostic startup after respring, zero request callbacks, list with no scope, getter mismatch, capture rejection and commit rejection are separate signals.

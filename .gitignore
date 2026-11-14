@@ -2,6 +2,9 @@
 .build/
 .swiftpm/
 .theos/
+.ci-theos/
+.ci-frameworks/
+build-evidence/
 packages/
 __pycache__/
 *.pyc

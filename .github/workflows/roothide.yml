@@ -43,6 +43,13 @@ jobs:
           swift --version > build-evidence/swift.txt
           xcrun --sdk iphoneos --show-sdk-path > build-evidence/sdk-path.txt
           git rev-parse HEAD > build-evidence/source-commit.txt
+      - name: Configure pinned Preferences framework linker stub
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci-frameworks/Preferences.framework
+          curl --fail --location --retry 3 'https://raw.githubusercontent.com/theos/sdks/0222fd5413cf4b9af096f37b4621afa2688572f7/iPhoneOS16.5.sdk/System/Library/PrivateFrameworks/Preferences.framework/Preferences.tbd' -o .ci-frameworks/Preferences.framework/Preferences.tbd
+          echo '9daceaff6cf94346594a12f9ef9c2ea23de15475b516f9e33c20871a018c098b  .ci-frameworks/Preferences.framework/Preferences.tbd' | shasum -a 256 -c - | tee build-evidence/preferences-stub.txt
       - name: Execute production Core XCTest
         shell: bash
         run: |
