@@ -3,8 +3,9 @@ import QuartzCore
 import CoreFoundation
 import Darwin
 
-// Real production Animator/Entry/bridge; synthetic notification classes and
-// runtime IMP shim only. NOT Substrate or private SpringBoard/device coverage.
+// Real production Animator/Entry/bridge; synthetic notification classes,
+// main-bundle identity adapter and runtime IMP shim in this unique test host.
+// NOT Substrate or private SpringBoard/device coverage.
 enum PartialNative {
     static var checks = 0
     static var attempts = 0
@@ -18,6 +19,7 @@ enum PartialNative {
     static func restore() {
         for (key, value) in zip(keys, saved) { CFPreferencesSetAppValue(key as CFString, value, domain) }
         CFPreferencesAppSynchronize(domain)
+        NDATestUseSpringBoardIdentity(false)
     }
     static func check(_ ok: @autoclosure () -> Bool, _ name: String) {
         guard ok() else { print("FAIL partial-native: \(name)"); restore(); exit(1) }
@@ -229,7 +231,12 @@ extension PartialNative {
     }
     static func run() {
         saved = keys.map { CFPreferencesCopyAppValue($0 as CFString, domain) }
-        check(Thread.isMainThread && Bundle.main.bundleIdentifier == "com.apple.springboard", "real installer and host-visibility bundle guard")
+        check(Thread.isMainThread && Bundle.main.bundleIdentifier == "com.tsangbaby.noticedeleteanimation.partial-native-tests", "unique real UIKit test-host identity")
+        check(!NDAInstallHooks({ _, _ in nil }, { _, _ in }), "production process guard rejects ordinary test host before identity adapter")
+        NDATestUseSpringBoardIdentity(true)
+        check(Bundle.main.bundleIdentifier == "com.apple.springboard", "explicit main-bundle identity adapter active only in test process")
+        NDASwiftStart()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
         check(!UIAccessibility.isReduceMotionEnabled, "explicit real Reduce Motion prerequisite OFF (not mocked)")
         enabled(true)
         contracts(); rejection(); lifecycle()
@@ -242,7 +249,7 @@ extension PartialNative {
             check(summary.contains("\n\(event): "), "real production event observed: \(event)")
         }
         restore()
-        print("PARTIAL NATIVE PASS: \(checks) checks; actual production Core/Animator/Entry/ObjC bridge+capture+diagnostics, real UIKit; synthetic classes + runtime IMP shim, NOT actual Substrate/private SpringBoard/device integration")
+        print("PARTIAL NATIVE PASS: \(checks) checks; actual production Core/Animator/Entry/ObjC bridge+capture+diagnostics, real UIKit; synthetic classes + runtime IMP and process-identity adapters, NOT actual Substrate/private SpringBoard/device integration")
         exit(0)
     }
 }

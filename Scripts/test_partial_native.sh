@@ -1,6 +1,7 @@
 #!/bin/bash
-# Real UIKit + ALL production integration sources. Only MSHookMessageEx is a
-# test runtime IMP shim; NOT actual Substrate/private SpringBoard/device coverage.
+# Real UIKit + ALL production sources in a UNIQUE registered CI test host.
+# Explicit test adapters: main-bundle process identity + runtime IMP replacement.
+# NOT actual Substrate/private SpringBoard/device coverage.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 for tool in xcrun codesign python3; do
@@ -50,11 +51,12 @@ xcrun --sdk iphonesimulator swiftc -parse-as-library -target "$triple" -sdk "$sd
 codesign --force -s - "$app/NDAPartialNative"
 codesign --force -s - "$app"
 codesign --verify --strict "$app"
-# Spawn the LOCAL bundle executable only; no simctl install, device, or respring.
-python3 - "$udid" "$app/NDAPartialNative" <<'PY'
+# Install only the unique TEST host into this ephemeral CI simulator.
+xcrun simctl install "$udid" "$app"
+python3 - "$udid" 'com.tsangbaby.noticedeleteanimation.partial-native-tests' <<'PY'
 import subprocess, sys
 try:
-    r = subprocess.run(['xcrun', 'simctl', 'spawn', sys.argv[1], sys.argv[2]],
+    r = subprocess.run(['xcrun', 'simctl', 'launch', '--console', '--terminate-running-process', sys.argv[1], sys.argv[2]],
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120,
                        text=True, errors='replace')
 except subprocess.TimeoutExpired:
@@ -63,3 +65,4 @@ print(r.stdout, end='', flush=True)
 if r.returncode or not any(l.startswith('PARTIAL NATIVE PASS: ') for l in r.stdout.splitlines()):
     sys.exit(r.returncode if r.returncode > 0 else 1)
 PY
+xcrun simctl uninstall "$udid" 'com.tsangbaby.noticedeleteanimation.partial-native-tests'

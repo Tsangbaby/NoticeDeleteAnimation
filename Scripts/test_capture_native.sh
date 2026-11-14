@@ -1,6 +1,6 @@
 #!/bin/bash
-# Real UIKit only. Reuse the runtime selected/booted by Preferences; never install
-# an app on a device (or simulator), boot a replacement, or turn absence into PASS.
+# Real UIKit only. Register a UNIQUE test host in the ephemeral CI simulator;
+# never install on the user's device or reuse/replace a system application.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build-evidence/capture-native
@@ -33,8 +33,8 @@ case "$arch" in arm64|x86_64) ;; *) echo 'FAIL: unsupported simulator host archi
 triple="$arch-apple-ios15.0-simulator"
 app="$work/NDACaptureNative.app"
 mkdir -p "$app"
-# A test-only bundle identity makes UIApplicationMain usable with simctl spawn;
-# this is NOT the installed Preferences/tweak application identity.
+# UIApplicationMain must be launched as a registered test host, not simctl spawn.
+# This unique CI-only identity never replaces Settings or SpringBoard.
 python3 - "$app/Info.plist" <<'PY'
 import plistlib, sys
 info = {
@@ -56,11 +56,13 @@ xcrun --sdk iphonesimulator clang -target "$triple" -isysroot "$sdk" \
   -framework UIKit -framework QuartzCore -framework Foundation -framework CoreGraphics \
   -o "$app/NDACaptureNative"
 codesign --force -s - "$app/NDACaptureNative"
-codesign --verify --strict "$app/NDACaptureNative"
-python3 - "$udid" "$app/NDACaptureNative" <<'PY'
+codesign --force -s - "$app"
+codesign --verify --strict "$app"
+xcrun simctl install "$udid" "$app"
+python3 - "$udid" 'com.tsangbaby.noticedeleteanimation.capture-native-tests' <<'PY'
 import subprocess, sys
 try:
-    result = subprocess.run(['xcrun', 'simctl', 'spawn', sys.argv[1], sys.argv[2]],
+    result = subprocess.run(['xcrun', 'simctl', 'launch', '--console', '--terminate-running-process', sys.argv[1], sys.argv[2]],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             timeout=120, text=True, errors='replace')
 except subprocess.TimeoutExpired:
@@ -72,5 +74,6 @@ if result.returncode != 0:
 if not any(line.startswith('CAPTURE NATIVE PASS: ') for line in result.stdout.splitlines()):
     sys.exit('FAIL: runtime exited without completing the pixel assertions.')
 PY
+xcrun simctl uninstall "$udid" 'com.tsangbaby.noticedeleteanimation.capture-native-tests'
 }
 run_capture 2>&1 | tee "$log"

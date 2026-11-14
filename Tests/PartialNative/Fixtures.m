@@ -14,6 +14,27 @@ void MSHookMessageEx(Class cls, SEL selector, IMP replacement, IMP *original) {
 }
 NSUInteger NDATestHookCount(void) { return hookCount; }
 
+// A unique installed UIKit host cannot register itself as a system application.
+// Adapt ONLY this process's main-bundle getter after normal app launch. This is
+// an explicit test dependency in addition to the runtime hook shim, not a claim
+// that the host is SpringBoard or that Substrate/private integration was tested.
+static BOOL testSpringBoardIdentity;
+static IMP realBundleIdentifier;
+static NSString *TestBundleIdentifier(id self, SEL cmd) {
+    if (testSpringBoardIdentity && self == NSBundle.mainBundle) return @"com.apple.springboard";
+    return ((NSString *(*)(id, SEL))realBundleIdentifier)(self, cmd);
+}
+void NDATestUseSpringBoardIdentity(BOOL enabled) {
+    if (!realBundleIdentifier) {
+        Class cls = object_getClass(NSBundle.mainBundle);
+        Method m = class_getInstanceMethod(cls, @selector(bundleIdentifier));
+        if (!m) abort();
+        realBundleIdentifier = method_getImplementation(m);
+        class_replaceMethod(cls, @selector(bundleIdentifier), (IMP)TestBundleIdentifier, method_getTypeEncoding(m));
+    }
+    testSpringBoardIdentity = enabled;
+}
+
 // Synthetic names/ABIs that the UNMODIFIED production installer discovers.
 // These are not private SpringBoard implementations or actual notifications.
 @class NCNotificationGroupList, NCNotificationStructuredListViewController;

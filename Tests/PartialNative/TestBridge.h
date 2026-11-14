@@ -1,4 +1,5 @@
 #import "NDABridge.h"
+#include <stdbool.h>
 NS_ASSUME_NONNULL_BEGIN
 typedef NS_ENUM(NSInteger, NDATestAction) {
     NDATestActionRemoveSource, NDATestActionRemoveCell, NDATestActionKeepAttached,
@@ -7,7 +8,7 @@ typedef NS_ENUM(NSInteger, NDATestAction) {
 };
 typedef struct {
     NSUInteger top, group, two, three, getters, index2, index3, getterIndex;
-    BOOL animated2, animated3, displaced, identities, didThrow;
+    bool animated2, animated3, displaced, identities, didThrow;
 } NDATestTrace;
 @interface NDATestFixture : NSObject { @public NDATestTrace trace; }
 @property(nonatomic, strong, readonly) UIWindow *window;
@@ -29,6 +30,8 @@ FOUNDATION_EXPORT void NDATestMutateDuringDraw(NDATestFixture *fixture);
 FOUNDATION_EXPORT void NDATestOnDraw(NDATestFixture *fixture, void (^callback)(void));
 FOUNDATION_EXPORT void NDATestForgetSource(NDATestFixture *fixture);
 FOUNDATION_EXPORT NSUInteger NDATestHookCount(void);
+// Test-host identity adapter; never changes CFBundle registration or production code.
+FOUNDATION_EXPORT void NDATestUseSpringBoardIdentity(BOOL enabled);
 FOUNDATION_EXPORT CGSize NDATestBackingSize(CALayer *tile);
 FOUNDATION_EXPORT BOOL NDATestNoHiddenRed(CALayer *tile);
 NS_ASSUME_NONNULL_END

@@ -362,17 +362,18 @@ static void RunCaptureTests(UIWindow *window) {
 @implementation NDACaptureTestDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options {
     (void)application; (void)options;
+    puts("CAPTURE HOST: didFinishLaunching");
     self.window = [[UIWindow alloc] initWithFrame:CGRectMake(0, 0, 390, 844)];
     UIViewController *root = [UIViewController new];
     root.view = [[UIView alloc] initWithFrame:self.window.bounds];
     self.window.rootViewController = root;
     [self.window makeKeyAndVisible];
-    dispatch_async(dispatch_get_main_queue(), ^{
+    [NSTimer scheduledTimerWithTimeInterval:0.05 repeats:NO block:^(__unused NSTimer *timer) {
         @autoreleasepool {
             RunCaptureTests(self.window);
             exit(0);
         }
-    });
+    }];
     return YES;
 }
 @end
