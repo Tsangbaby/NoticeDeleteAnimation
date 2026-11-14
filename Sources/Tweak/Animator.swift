@@ -191,39 +191,10 @@ final class NDAAnimator {
         CATransaction.commit()
     }
 
-    /// Axis-aligned affine scale/translation is represented by convert(_:to:).
-    /// Rotation, shear, perspective and flips need a different texture mapping.
-    private func supportedTransform(_ transform: CATransform3D) -> Bool {
-        guard CATransform3DIsAffine(transform) else { return false }
-        let affine = CATransform3DGetAffineTransform(transform)
-        return affine.a.isFinite && affine.d.isFinite && affine.tx.isFinite && affine.ty.isFinite &&
-            affine.a > 0 && affine.d > 0 && abs(affine.b) < 0.000001 && abs(affine.c) < 0.000001
-    }
-
-    /// A snapshot must not reveal content hidden by an intermediate wrapper. Reject
-    /// unsupported transforms/masks, partial clipping and ancestor animations rather
-    /// than promoting concealed content into a top-level list overlay.
+    /// Fail closed exactly as before; diagnostics contain only the first failure.
     private func visibleSource(_ source: UIView, through surface: UIView, window: UIWindow) -> Bool {
-        var current: UIView? = source
-        var reachedSurface = false
-        var effectiveAlpha: CGFloat = 1
-        var depth = 0
-        while let view = current, depth < 64 {
-            depth += 1
-            effectiveAlpha *= view.alpha
-            guard !view.isHidden, effectiveAlpha >= 0.99,
-                  supportedTransform(view.layer.transform),
-                  CATransform3DIsIdentity(view.layer.sublayerTransform),
-                  view.layer.mask == nil,
-                  (view.layer.animationKeys() ?? []).isEmpty else { return false }
-            if view.clipsToBounds {
-                let rect = source.convert(source.bounds, to: view)
-                guard view.bounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) else { return false }
-            }
-            if view === surface { reachedSurface = true }
-            if view === window { return reachedSurface }
-            current = view.superview
-        }
+        guard let failure = NDAAncestorGate.failure(source, through: surface, window: window) else { return true }
+        NDARecordAncestorFailure(failure.reason.event, failure.view, failure.depth, failure.effectiveAlpha)
         return false
     }
 
