@@ -138,8 +138,12 @@ struct NDAVisibleRegion {
             let maxX = origin.x + right / scale, maxY = origin.y + bottom / scale
             let crop = CGRect(x: x, y: y, width: maxX - x, height: maxY - y)
             let pixelsWide = crop.width * scale, pixelsHigh = crop.height * scale
+            // Match the cropped renderer exactly: never let bitmap rounding
+            // expand a non-integral extent, or admit a dimension/budget it rejects.
             guard right - left > 1, bottom - top > 1,
                   pixelsWide.isFinite, pixelsHigh.isFinite, pixelsWide > 1, pixelsHigh > 1,
+                  pixelsWide == pixelsWide.rounded(.down), pixelsHigh == pixelsHigh.rounded(.down),
+                  pixelsWide <= 4096, pixelsHigh <= 4096, pixelsWide * pixelsHigh <= 220_000,
                   pixelsWide < indexLimit, pixelsHigh < indexLimit,
                   NDAVisibleRegionPlanner.safeRect(crop), sourceRect.contains(crop),
                   let mapped = NDAVisibleRegionPlanner.map(crop, from: source, to: surface) else { return nil }

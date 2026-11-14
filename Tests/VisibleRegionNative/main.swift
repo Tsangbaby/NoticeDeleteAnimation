@@ -464,7 +464,7 @@ extension VisibleRegionNativeTests {
                   "binary-grid alignment is idempotent")
             check(states.allSatisfy { $0.unchanged }, "alignment has no UIKit mutations")
         }
-        for scale in [CGFloat(1), 1.5, 2, 3, 4] {
+        for scale in [CGFloat(0.5), 1, 2, 4] {
             let f = fixture()
             f.wrapper.clipsToBounds = true
             f.source.frame = CGRect(x: -10.25, y: -3.125, width: 100.375, height: 80.375)
@@ -476,8 +476,34 @@ extension VisibleRegionNativeTests {
             check(p.sourceRect.contains(q.sourceRect) && f.source.bounds.contains(q.sourceRect), "source crop never grows at \(scale)")
             check(p.surfaceRect.contains(q.surfaceRect) && q.clipRect.contains(q.surfaceRect), "mapped crop never grows at \(scale)")
             check(q.sourceRect.width * scale > 1 && q.sourceRect.height * scale > 1, "positive multi-pixel crop at \(scale)")
+            check(q.sourceRect.width * scale == (q.sourceRect.width * scale).rounded(.down) &&
+                  q.sourceRect.height * scale == (q.sourceRect.height * scale).rounded(.down),
+                  "successful alignment has exactly integral renderer extents at \(scale)")
             check(f.source.convert(q.sourceRect.origin, to: f.surface) == q.surfaceRect.origin,
                   "actual UIKit source-crop placement at \(scale)")
+        }
+        do {
+            let f = fixture()
+            f.wrapper.clipsToBounds = true
+            f.source.frame = CGRect(x: -10.25, y: -3.125, width: 100.375, height: 80.375)
+            f.source.bounds.origin = CGPoint(x: -4.125, y: -9.375)
+            let p = accepted(f, "non-binary grid division")
+            check(p.inwardAligned(scale: 1.5, source: f.source, surface: f.surface) == nil,
+                  "reject non-integral represented pixel height; never add an outward epsilon")
+        }
+        for size in [CGSize(width: 300, height: 2), CGSize(width: 2, height: 300)] {
+            let f = fixture(); f.source.frame = CGRect(origin: .zero, size: size)
+            let p = accepted(f, "renderer dimension ceiling \(size)")
+            check(p.inwardAligned(scale: 16, source: f.source, surface: f.surface) == nil,
+                  "reject renderer pixel dimension above 4096")
+        }
+        do {
+            let f = fixture(); f.source.frame = f.surface.bounds
+            let p = accepted(f, "renderer pixel budget")
+            check(p.inwardAligned(scale: 1, source: f.source, surface: f.surface) == nil,
+                  "reject renderer bitmap above 220000 pixels")
+            check(p.inwardAligned(scale: 0.5, source: f.source, surface: f.surface) != nil,
+                  "smaller binary capture scale meets strict bitmap budget")
         }
         do {
             let f = fixture(), p = accepted(f, "invalid scale inputs")

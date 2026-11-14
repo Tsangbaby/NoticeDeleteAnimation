@@ -40,7 +40,7 @@
   "Sources/Tweak/AncestorGate.swift": "97bc95bdd3cb1e20e01f7c7784c420798712e367100bb1eaff76ded0d983c723",
   "Sources/Tweak/Animator.swift": "5c612431d5224421137cefd977b9cc93b879dd153eefc8b32626496ebd35262a",
   "Sources/Tweak/Entry.swift": "8a727c0f4a610451bdb8ae9aff3541496dcf27a042621789e48af1ad377a71d4",
-  "Sources/Tweak/VisibleRegion.swift": "f4c591ee84c48b1e82678d8a9b0ca43a565fdfccb25908de430db1fd3701dadf",
+  "Sources/Tweak/VisibleRegion.swift": "a632c881efd62ca40b3ef833d9acd3b1fcbed3c59f6e5cc4a022a56e69c727c8",
   "Tests/AncestorNative/main.swift": "8bc7fc45b8a07519af4d341dc58176ba5fc8e76560f805094d779043bd66007e",
   "Tests/CaptureNative/main.m": "1265c9171cc7da19997d345c20ef5aea5da7457da3d3631753a2c25e652f81b7",
   "Tests/CoreTests/AdmissionTests.swift": "b5523f1538b7a175b4d372db2378515f8fd77ad6b2391994bb549008da083f1a",
@@ -53,7 +53,7 @@
   "Tests/PartialNative/substrate.h": "14c48b4e8e826c1214754790ee19cb8f8c9b7e9de23364b8334f9391d7e14f19",
   "Tests/PreferencesLoad/main.m": "1a77a94fa08bc8e929d99ba4e0d255f5059e98923515eb750094bc00a2e6d7b3",
   "Tests/UIKit/SurfaceGeometryTests.swift": "434fdac8cce355e5c54a06eb0f1087ce1174e110caf7cc33517ca740c908edff",
-  "Tests/VisibleRegionNative/main.swift": "1015a821bd59d3f44eec4a82c2c906d95098ab143f68e414a0abfdea2680c69d",
+  "Tests/VisibleRegionNative/main.swift": "671cb384c49c3c6b9eabc9c152d507bc52c552bbdec660b9dc4d253799d86dfe",
   "build-evidence/visible-region-native-tests.txt": "8e68abaed4a65aa16786932ba616c69d7893bc78a015232a209837db96da4a80",
   "control": "553366d583f51f10003e1d951672eb01119917ec110728f6388601f8f8fb8582",
   "layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist": "d2a1ef8d779f4dfbcccb1293f97022bf0a50317ac1d63c918b50a683b98c684c"
