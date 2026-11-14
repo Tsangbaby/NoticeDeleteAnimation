@@ -224,6 +224,10 @@ BOOL NDATestNoHiddenRed(CALayer *tile) {
     CGContextDrawImage(c, CGRectMake(0, 0, w, h), image); CGContextRelease(c);
     BOOL ok = YES;
     for (size_t i = 0; i < w * h; ++i)
-        if (p[i*4] > 10 || p[i*4+1] < 245 || p[i*4+2] > 10 || p[i*4+3] < 245) { ok = NO; break; }
+        if (p[i*4] > 10 || p[i*4+1] < 245 || p[i*4+2] > 10 || p[i*4+3] < 245) {
+            fprintf(stdout, "PARTIAL PIXEL failure x=%zu y=%zu rgba=%u,%u,%u,%u size=%zux%zu\n",
+                i % w, i / w, p[i*4], p[i*4+1], p[i*4+2], p[i*4+3], w, h);
+            ok = NO; break;
+        }
     free(p); return ok;
 }

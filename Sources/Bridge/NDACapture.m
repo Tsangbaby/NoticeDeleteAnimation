@@ -53,6 +53,11 @@ UIImage * _Nullable NDACaptureRegion(UIView *view, CGRect region, CGFloat scale)
             CGContextSaveGState(cg);
             @try {
                 CGContextClipToRect(cg, (CGRect){CGPointZero, region.size});
+                // Do not interpolate a full-view backing across the crop boundary:
+                // a reconstruction filter can mix hidden-side texels into edge pixels.
+                // Tile filtering later samples ONLY this cropped backing.
+                CGContextSetInterpolationQuality(cg, kCGInterpolationNone);
+                CGContextSetShouldAntialias(cg, NO);
                 // Draw the FULL source at its original logical size, translated
                 // so region.min maps to output zero. Drawing only region.size
                 // here would rescale hidden source content into the crop.
