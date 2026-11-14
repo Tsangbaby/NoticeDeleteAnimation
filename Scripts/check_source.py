@@ -101,13 +101,18 @@ class SourceContracts(unittest.TestCase):
         self.assertEqual(info['NSPrincipalClass'], 'NDASettingsController')
         self.assertEqual(entry['bundle'], info['CFBundleExecutable'])
         self.assertIs(entry['isController'], True)
-        self.assertNotIn('detail', entry)
+        self.assertEqual(entry.get('detail'), info['NSPrincipalClass'])
         self.assertEqual(info['MinimumOSVersion'], '15.0')
         source = (prefs / 'NDASettingsController.swift').read_text()
         for key in ('DiagnosticsSummary', 'DiagnosticsUpdated', 'DiagnosticsPID'):
             self.assertIn(key, source)
         self.assertIn('com.tsangbaby.noticedeleteanimation', source)
         self.assertIn('SUBPROJECTS += Preferences', (ROOT / 'Makefile').read_text())
+        self.assertIn('super.specifiers = items', source)
+        self.assertIn('super.specifiers = newValue', source)
+        self.assertLess(source.index('specifiers = NDAMakeSettingsSpecifiers'), source.index('super.viewDidLoad()'))
+        factory = (prefs / 'NDAPreferencesBridge.m').read_text()
+        self.assertIn('general, enabled, diagnostics, refresh, privacy, nil', factory)
 
     def test_no_persistence_or_content_logging(self):
         for path in list((ROOT / 'Sources').rglob('*.swift')) + list((ROOT / 'Sources').rglob('*.m')):

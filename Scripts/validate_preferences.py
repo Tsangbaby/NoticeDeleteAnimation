@@ -10,7 +10,7 @@ r=plistlib.loads(registration.read_bytes())
 entry=r['entry']
 assert entry['bundle']=='NDAPreferences'
 assert entry.get('isController') is True
-assert 'detail' not in entry
+assert entry.get('detail') == 'NDASettingsController', 'Explicit controller detail missing (alpha3 regression)'
 info=plistlib.loads((bundle/'Info.plist').read_bytes())
 assert info['NSPrincipalClass']=='NDASettingsController'
 binary=bundle/info['CFBundleExecutable']

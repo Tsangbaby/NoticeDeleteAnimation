@@ -1,5 +1,7 @@
 # alpha3: Settings registration
 
+> Historical candidate, superseded by SETTINGS-ALPHA4.md. The claim below that pl_lazyLoadBundleCore resolves principalClass was incorrect: it calls the system original and checks bundle loading, but does not itself assign detailControllerClass. Do not use alpha3's detail-absent rule as a current acceptance gate.
+
 User confirmed alpha2 installed on RootHide iOS16.0.3; other tweaks' Settings entries visible, this entry absent. Do not repeat version/respring questions.
 
 Official roothide/preferenceloader branch roothide, prefs.xm: specifier generation reads entry.isController. true selects PLCustomListController and hooks lazy bundle loading; false selects plist/PSListController route. pl_lazyLoadBundleCore loads the bundle and resolves principalClass. alpha2 incorrectly omitted isController and supplied an as-yet-unloaded NDASettingsController detail class.

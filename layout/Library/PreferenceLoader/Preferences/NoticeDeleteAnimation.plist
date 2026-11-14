@@ -7,6 +7,7 @@
         <key>bundle</key><string>NDAPreferences</string>
         <key>cell</key><string>PSLinkCell</string>
         <key>isController</key><true/>
+        <key>detail</key><string>NDASettingsController</string>
         <key>label</key><string>NoticeDeleteAnimation</string>
     </dict>
 </dict>

@@ -2,7 +2,7 @@ name: RootHide source build
 on:
   workflow_dispatch:
   push:
-    branches: ['build/**', 'fix/ios16-diagnostics-alpha2', 'fix/settings-registration-alpha3']
+    branches: ['build/**', 'fix/ios16-diagnostics-alpha2', 'fix/settings-registration-alpha3', 'fix/settings-content-alpha4']
 permissions:
   contents: read
 jobs:
@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Toolchain and package tools
         shell: bash
         run: |
@@ -55,6 +56,9 @@ jobs:
         run: |
           set -euo pipefail
           swift test 2>&1 | tee build-evidence/core-tests.txt
+      - name: Real simulator Preferences load regression
+        shell: bash
+        run: bash Scripts/test_preferences_native.sh
       - name: Compile and package arm64 plus arm64e
         shell: bash
         run: |

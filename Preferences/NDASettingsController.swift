@@ -10,15 +10,22 @@ final class NDASettingsController: PSListController {
 
     override var specifiers: NSMutableArray! {
         get {
-            if let cached = cachedSpecifiers { return cached }
-            let items = NDAMakeSettingsSpecifiers(self, diagnosticText())
+            let items = cachedSpecifiers ?? NDAMakeSettingsSpecifiers(self, diagnosticText())
             cachedSpecifiers = items
+            // Preferences also reads its own _specifiers ivar for table sections.
+            // A Swift-only cache is not the superclass's table model.
+            super.specifiers = items
             return items
         }
-        set { cachedSpecifiers = newValue }
+        set {
+            cachedSpecifiers = newValue
+            super.specifiers = newValue
+        }
     }
 
     override func viewDidLoad() {
+        // Populate the actual Preferences model before UIKit builds its table.
+        specifiers = NDAMakeSettingsSpecifiers(self, diagnosticText())
         super.viewDidLoad()
         title = "NoticeDeleteAnimation"
         navigationItem.rightBarButtonItem = UIBarButtonItem(
