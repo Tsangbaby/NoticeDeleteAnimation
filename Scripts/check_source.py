@@ -100,7 +100,8 @@ class SourceContracts(unittest.TestCase):
         entry = plistlib.loads((ROOT / 'layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist').read_bytes())['entry']
         self.assertEqual(info['NSPrincipalClass'], 'NDASettingsController')
         self.assertEqual(entry['bundle'], info['CFBundleExecutable'])
-        self.assertEqual(entry['detail'], info['NSPrincipalClass'])
+        self.assertIs(entry['isController'], True)
+        self.assertNotIn('detail', entry)
         self.assertEqual(info['MinimumOSVersion'], '15.0')
         source = (prefs / 'NDASettingsController.swift').read_text()
         for key in ('DiagnosticsSummary', 'DiagnosticsUpdated', 'DiagnosticsPID'):

@@ -9,7 +9,8 @@ assert registration.is_file(), registration
 r=plistlib.loads(registration.read_bytes())
 entry=r['entry']
 assert entry['bundle']=='NDAPreferences'
-assert entry['detail']=='NDASettingsController'
+assert entry.get('isController') is True
+assert 'detail' not in entry
 info=plistlib.loads((bundle/'Info.plist').read_bytes())
 assert info['NSPrincipalClass']=='NDASettingsController'
 binary=bundle/info['CFBundleExecutable']

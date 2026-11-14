@@ -2,7 +2,7 @@ name: RootHide source build
 on:
   workflow_dispatch:
   push:
-    branches: ['build/**', 'fix/ios16-diagnostics-alpha2']
+    branches: ['build/**', 'fix/ios16-diagnostics-alpha2', 'fix/settings-registration-alpha3']
 permissions:
   contents: read
 jobs:

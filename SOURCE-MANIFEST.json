@@ -1,10 +1,11 @@
 {
-  ".github/workflows/roothide.yml": "500f40efb4a0df4b078c81efa6066b6786b98e0e3f7eb7e25382e1b3d1ed841d",
+  ".github/workflows/roothide.yml": "9d428c5ecf55c4aae4d357bd2d7986cecb69cb1c00221c50e32b6c8378b3bc12",
   ".gitignore": "400aab489e6a11ac3691847271e3c8e45a49aedeec6e5de5c033310d06571bf6",
   "Docs/BUILD-STAGE.md": "67ce278983237a210ad2e06dd23e7452ed1a60f9842f922c2ad628add83a0dbf",
   "Docs/IOS16-ALPHA2.md": "8dc219445002a7866e9b98219c01c5806c698d019300c4262b58a6d2bd95f9df",
   "Docs/LOCAL-CHECKS.txt": "d3de5a1fb8b83d9dbe46e5278f572b6bb0f274d4721f6acc92e6669a7f1ff664",
   "Docs/PLAN.md": "83088f45b0810331dfb62104c9d8facb5b5e263961c167db0910a699b6827932",
+  "Docs/SETTINGS-ALPHA3.md": "9741ad0f5b0a1d405c2c44b7ffa7d51ce9e4d9a9af27d15ade2c0794faf4063e",
   "Docs/SYSTEM-API.md": "0a38ee7148a99c12dfe1b2f4e5df3163edc2cf2d7b7f6e1a1ef5aa26c68564d5",
   "Docs/VERIFICATION.md": "3caee6a31a4a4b97dfc9968a44cb258d78f37cc5b7a41dc7a673b8da521eab1a",
   "Makefile": "926a9b47a1814aa65c64a6f9888f28ecfb2d659250713297ca9d959c524c9a0d",
@@ -17,9 +18,9 @@
   "Preferences/Resources/Info.plist": "5b95bf913a025dd1680bab00cef62c1a002ae75df2bde74c8c266e20d4e83aca",
   "README.md": "42e7662f771fceef3f485248b51e7c3010adaef12012f09e906418f128868f82",
   "Scripts/archive_source.py": "56c8c30e174cee23dbc97185e80f1ceea0ed83308a54db8d7ed69aa29d0ca8cb",
-  "Scripts/check_source.py": "0a685cb0337f81798f45eca1bb87d771772e7a7ead3b0a245c8ba5f3d17e888e",
+  "Scripts/check_source.py": "fa742b8d20941dca22a5fe4231892af9c0c4338fdc36ead7b4e4cd4149fae755",
   "Scripts/validate_package.py": "1bf53f09d935133c58f3410042949797bfd253545ec491a5ac9a46dbc79bc038",
-  "Scripts/validate_preferences.py": "6ba8501e4d958c422542f82fe4e7d7e3fd4f574e369384aafa90a28514502f8a",
+  "Scripts/validate_preferences.py": "2e8b21f3d57fe9149f300be1e8e45170607f2663de06aca5b43d33b1fb79e9a3",
   "Sources/Bridge/NDABridge.h": "e01747aba4a86b1f31e9c2c3884baca0dcfc04c6489cb1f043038f387e80fd46",
   "Sources/Bridge/NDABridge.m": "c0d7ca32cda6acd1741fd25078d99f090c6f46b70f98ef1c87951618e71442ed",
   "Sources/Bridge/NDADiagnostics.m": "128ea4bf1841308ba5419b7c6dba4288614b9e098ad9f1cc8dfc9f98fa64d9a6",
@@ -32,6 +33,6 @@
   "Tests/CoreTests/HostVisibilityTests.swift": "c1778f01202b1ee456932a8333dee120dc94f8c8e739af9915459f49c34c1366",
   "Tests/CoreTests/ParticlePlanTests.swift": "fabb6f1425474e299a40259a18158c20daad46c55219712c889d432ca998dc8d",
   "Tests/UIKit/SurfaceGeometryTests.swift": "434fdac8cce355e5c54a06eb0f1087ce1174e110caf7cc33517ca740c908edff",
-  "control": "8e6e062c4cd81cf6146b0f234734f31b4a208d9cea9e2aa4a3ff53df72174a5b",
-  "layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist": "f33a8c170d519c032d16e3b0c141da4f715fed9a18d0dfd9f0b4313b96aec2a4"
+  "control": "4ac05f092c07a2beb93979798d5db4d1cc4223c6f9d533c014c945d90da4e351",
+  "layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist": "12ba6f220159df25c1441b5e08cb9259ca9c84c16893534adf7113ffbfb09ed5"
 }
