@@ -34,7 +34,7 @@
   "Tests/CoreTests/AdmissionTests.swift": "b5523f1538b7a175b4d372db2378515f8fd77ad6b2391994bb549008da083f1a",
   "Tests/CoreTests/HostVisibilityTests.swift": "c1778f01202b1ee456932a8333dee120dc94f8c8e739af9915459f49c34c1366",
   "Tests/CoreTests/ParticlePlanTests.swift": "fabb6f1425474e299a40259a18158c20daad46c55219712c889d432ca998dc8d",
-  "Tests/PreferencesLoad/main.m": "830483aae2b823a13e40b32d3ebf5e5b985c09d8b1f760f6e5673147f48d64c4",
+  "Tests/PreferencesLoad/main.m": "1a77a94fa08bc8e929d99ba4e0d255f5059e98923515eb750094bc00a2e6d7b3",
   "Tests/UIKit/SurfaceGeometryTests.swift": "434fdac8cce355e5c54a06eb0f1087ce1174e110caf7cc33517ca740c908edff",
   "control": "68d5dc9f2df24d7bfdde06890d3d9f9c190bb186b44f13c317fcd9e447ced1ab",
   "layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist": "d2a1ef8d779f4dfbcccb1293f97022bf0a50317ac1d63c918b50a683b98c684c"

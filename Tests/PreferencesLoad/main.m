@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
         require(specs.count == 1, @"real parser returned entry");
         PSSpecifier *s = specs[0];
         // Same lazy-bundle property assignment as official prefs.xm:460-463.
-        NSString **lazyKey = dlsym(RTLD_DEFAULT, "PSLazilyLoadedBundleKey");
+        NSString *__unsafe_unretained *lazyKey = (NSString *__unsafe_unretained *)dlsym(RTLD_DEFAULT, "PSLazilyLoadedBundleKey");
         require(lazyKey != NULL, @"lazy-load key available");
         [s setProperty:path forKey:*lazyKey];
         SEL lazy = NSSelectorFromString(@"lazyLoadBundle:");
