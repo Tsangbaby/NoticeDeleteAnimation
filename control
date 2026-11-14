@@ -1,6 +1,6 @@
 Package: com.tsangbaby.noticedeleteanimation
 Name: NoticeDeleteAnimation
-Version: 0.1.0~alpha6
+Version: 0.1.0~alpha7
 Architecture: iphoneos-arm
 Description: Swift-driven particle dissolve effect for notification removal. Source candidate, device validation required.
 Maintainer: Tsangbaby

@@ -66,7 +66,7 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('admission.expire(', source)
         self.assertIn('admission.release(', source)
         self.assertIn('UIAccessibility.isReduceMotionEnabled', source)
-        self.assertIn('container.bounds = surface.bounds', source)
+        self.assertIn('container.bounds = region.clipRect', source)
         self.assertIn('visibleSource(source, through: surface, window: window)', source)
         self.assertIn('handle.source?.isDescendant(of: surface) != true', source)
         self.assertIn('animation.duration = particle.duration', source)
@@ -122,7 +122,7 @@ class SourceContracts(unittest.TestCase):
         for reason in ('hidden', 'alpha', 'transform', 'sublayer', 'mask', 'animations', 'clipping', 'depth', 'hierarchy'):
             self.assertIn('ancestor.' + reason, writer)
             self.assertIn('.' + reason, gate)
-        self.assertIn('NDAAncestorGate.failure(source', animator)
+        self.assertIn('NDAVisibleRegionPlanner.resolve(source', animator)
         self.assertIn('Sources/Tweak/AncestorGate.swift', harness)
         self.assertIn('Sources/Bridge/NDADiagnostics.m', harness)
         self.assertIn('depth < 64', gate)
@@ -131,7 +131,7 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('name.length > 80', writer)
         self.assertIn('/System/Library/', writer)
         self.assertIn('[ancestorCodes containsObject:code]', writer)
-        self.assertIn('NoticeDeleteAnimation alpha6', writer)
+        self.assertIn('NoticeDeleteAnimation alpha7', writer)
         self.assertNotIn('view.description', writer)
         bridge = (ROOT / 'Sources/Bridge/NDABridge.m').read_text()
         for variant in ('2', '3'):
@@ -167,6 +167,46 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('"$work/alpha5-baseline.swift"', harness)
         self.assertIn('exit 1', harness)
         self.assertNotIn('exit 0', harness)
+
+    def test_alpha7_full_chain_crop_and_lifecycle_contract(self):
+        planner = (ROOT / 'Sources/Tweak/VisibleRegion.swift').read_text()
+        capture = (ROOT / 'Sources/Bridge/NDACapture.m').read_text()
+        animator = (ROOT / 'Sources/Tweak/Animator.swift').read_text()
+        bridge = (ROOT / 'Sources/Bridge/NDABridge.m').read_text()
+        writer = (ROOT / 'Sources/Bridge/NDADiagnostics.m').read_text()
+        workflow = (ROOT / '.github/workflows/roothide.yml').read_text()
+        for required in ('NDAVisibleRegionPlanner.resolve(source', 'inwardAligned(scale: desiredScale',
+                         'NDACaptureRegion(source, region.sourceRect, desiredScale)',
+                         'region.isCaptureValid(source: source, surface: surface, window: window)',
+                         'checkedAligned.sourceRect == region.sourceRect',
+                         'checkedAligned.surfaceRect == region.surfaceRect',
+                         'checkedAligned.clipRect == region.clipRect',
+                         'handle.region.isValid(surface: surface, window: window)',
+                         'handle.source?.window == nil', 'cgImage.width == width',
+                         'container.bounds = region.clipRect'):
+            self.assertIn(required, animator)
+        self.assertNotIn('NDACaptureView(source', animator)
+        self.assertNotIn('source.convert(source.bounds, to: surface)', animator)
+        self.assertNotIn('source.alpha =', animator)
+        for required in ('NDARecordRegionPrepared', 'Prepared region:', 'capture.partial',
+                         'capture.full', 'source_crop=', 'surface_crop=', 'safe_clip='):
+            self.assertIn(required, writer)
+        for required in ('region.origin.x < bounds.origin.x', 'pixelWidth != floor(pixelWidth)',
+                         'bounds.origin.x - region.origin.x', 'CGContextClipToRect',
+                         'drawViewHierarchyInRect:target', 'CGImageGetWidth(cgImage) !='):
+            self.assertIn(required, capture)
+        for forbidden in ('renderInContext:', 'snapshotViewAfterScreenUpdates:', 'source.transform ='):
+            self.assertNotIn(forbidden, capture)
+        self.assertNotIn('UIGraphicsImageRenderer', bridge)
+        self.assertIn('weak var view:', planner)
+        self.assertIn('isCaptureValid', planner)
+        self.assertIn('layer.masksToBounds', planner)
+        self.assertIn('cornerRadius', planner)
+        self.assertNotIn('CSScrollView', planner)
+        self.assertNotIn('contentOffset =', planner)
+        for script in ('test_visible_region_native.sh', 'test_capture_native.sh', 'test_partial_native.sh'):
+            self.assertIn(script, workflow)
+        self.assertIn('fix/partial-visibility-alpha7', workflow)
 
     def test_no_persistence_or_content_logging(self):
         for path in list((ROOT / 'Sources').rglob('*.swift')) + list((ROOT / 'Sources').rglob('*.m')):

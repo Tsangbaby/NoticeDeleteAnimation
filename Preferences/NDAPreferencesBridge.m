@@ -21,6 +21,6 @@ NSMutableArray<PSSpecifier *> *NDAMakeSettingsSpecifiers(
     refresh.buttonAction = @selector(nda_refreshDiagnostics);
 
     PSSpecifier *privacy = [PSSpecifier groupSpecifierWithName:@"隐私说明"];
-    [privacy setProperty:@"只读取 SpringBoard 保存的固定故障计数、最近拒绝祖先及源视图的系统类名、限幅状态和矩形坐标/局部交集、更新时间及进程 PID；不读取通知正文、标识、账户或凭据，不保存图片、不导出层级、不联网。刷新不会重启 SpringBoard，也不会触发通知删除。" forKey:@"footerText"];
+    [privacy setProperty:@"只读取 SpringBoard 保存的固定故障计数、最近拒绝或准备裁片的系统类名、限幅状态及矩形坐标、更新时间及进程 PID；不读取通知正文、标识、账户或凭据，不保存图片、不导出层级、不联网。刷新不会重启 SpringBoard，也不会触发通知删除。" forKey:@"footerText"];
     return [NSMutableArray arrayWithObjects:general, enabled, diagnostics, refresh, privacy, nil];
 }

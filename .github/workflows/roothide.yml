@@ -2,7 +2,7 @@ name: RootHide source build
 on:
   workflow_dispatch:
   push:
-    branches: ['build/**', 'fix/ios16-diagnostics-alpha2', 'fix/settings-registration-alpha3', 'fix/settings-content-alpha4', 'fix/ancestor-diagnostics-alpha5', 'fix/clipping-geometry-alpha6']
+    branches: ['build/**', 'fix/ios16-diagnostics-alpha2', 'fix/settings-registration-alpha3', 'fix/settings-content-alpha4', 'fix/ancestor-diagnostics-alpha5', 'fix/clipping-geometry-alpha6', 'fix/partial-visibility-alpha7']
 permissions:
   contents: read
 jobs:
@@ -62,6 +62,15 @@ jobs:
       - name: Real simulator production ancestor gate regression
         shell: bash
         run: bash Scripts/test_ancestors_native.sh
+      - name: Real simulator full-chain visible region regression
+        shell: bash
+        run: bash Scripts/test_visible_region_native.sh
+      - name: Real simulator cropped capture pixel regression
+        shell: bash
+        run: bash Scripts/test_capture_native.sh
+      - name: Real simulator partial Animator and runtime-shim hook regression
+        shell: bash
+        run: bash Scripts/test_partial_native.sh
       - name: Compile and package arm64 plus arm64e
         shell: bash
         run: |

@@ -12,4 +12,8 @@ FOUNDATION_EXPORT void NDARecordClippingFailure(UIView *source, UIView *view, NS
 FOUNDATION_EXPORT BOOL NDAInstallHooks(NDAPrepareEffect prepare, NDAFinishEffect finish);
 /// Exception-contained UIKit capture. Returns nil on unsupported/failed snapshots.
 FOUNDATION_EXPORT UIImage * _Nullable NDACaptureView(UIView *view, CGFloat scale);
+/// Capture only a contained source-local crop; never mutate or snapshot an ancestor.
+FOUNDATION_EXPORT UIImage * _Nullable NDACaptureRegion(UIView *view, CGRect region, CGFloat scale);
+/// Fixed bounded geometry of the last successfully prepared crop, no content retained.
+FOUNDATION_EXPORT void NDARecordRegionPrepared(UIView *source, CGRect sourceRect, CGRect surfaceRect, CGRect clipRect, BOOL partial);
 NS_ASSUME_NONNULL_END

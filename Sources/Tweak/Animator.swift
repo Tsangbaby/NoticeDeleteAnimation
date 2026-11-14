@@ -15,18 +15,20 @@ final class NDAEffectHandle: NSObject {
     weak var window: UIWindow?
     let surfaceBounds: CGRect
     let sourceFrame: CGRect
+    let region: NDAVisibleRegion
     let plan: NDAParticlePlan
     var committed = false
     var deadline: CFTimeInterval
 
     init(lease: NDAEffectLease, container: NDAEffectSurface, surface: UIView,
-         frame: CGRect, plan: NDAParticlePlan) {
+         region: NDAVisibleRegion, plan: NDAParticlePlan) {
         self.lease = lease
         self.container = container
         self.surface = surface
         self.window = surface.window
         self.surfaceBounds = surface.bounds
-        self.sourceFrame = frame
+        self.sourceFrame = region.surfaceRect
+        self.region = region
         self.plan = plan
         self.deadline = CACurrentMediaTime() + 0.12
     }
@@ -41,6 +43,7 @@ final class NDAAnimator {
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var seed: UInt64 = 0
+    private var cancellationEpoch: UInt64 = 0
 
     private init() {
         let names: [Notification.Name] = [UIApplication.willResignActiveNotification,
@@ -69,44 +72,59 @@ final class NDAAnimator {
               source.bounds.width <= 2048, source.bounds.height <= 2048 else {
             NDARecordEvent("capture.geometry"); return nil
         }
-        guard visibleSource(source, through: surface, window: window) else {
+        guard let visible = visibleSource(source, through: surface, window: window) else {
             NDARecordEvent("capture.ancestors"); return nil
+        }
+        // Pick scale BEFORE inward alignment. Capture never rounds a hidden edge outward.
+        let area = visible.sourceRect.width * visible.sourceRect.height
+        guard area.isFinite, area > 0 else { NDARecordEvent("capture.geometry"); return nil }
+        let desiredScale = captureScale(area: area, nativeScale: window.screen.scale)
+        guard desiredScale.isFinite, desiredScale > 0,
+              let region = visible.inwardAligned(scale: desiredScale, source: source, surface: surface),
+              region.sourceRect.width > 1, region.sourceRect.height > 1,
+              region.isCaptureValid(source: source, surface: surface, window: window) else {
+            NDARecordEvent("capture.geometry"); return nil
         }
         sweep()
         guard handles.count < policy.maxConcurrent else { NDARecordEvent("capture.capacity"); return nil }
-        let frame = source.convert(source.bounds, to: surface)
+        let frame = region.surfaceRect
         guard frame.width.isFinite, frame.height.isFinite,
               frame.origin.x.isFinite, frame.origin.y.isFinite,
               frame.width > 1, frame.height > 1,
-              surface.bounds.intersects(frame),
-              surface.bounds.insetBy(dx: -1, dy: -1).contains(frame) else {
+              region.clipRect.contains(frame) else {
             NDARecordEvent("capture.geometry"); return nil
         }
         seed &+= 1
         guard let plan = NDAParticlePlan.make(width: Double(frame.width),
             height: Double(frame.height), seed: seed, policy: policy) else { NDARecordEvent("capture.plan"); return nil }
-        // Capture at <=2x and <=220k pixels per effect. Reject before allocation if
-        // accounting is already full. UIGraphics may ceil each bitmap dimension.
-        let desiredScale = min(window.screen.scale, 2,
-            sqrt(220_000 / (source.bounds.width * source.bounds.height)))
-        guard desiredScale.isFinite, desiredScale > 0 else { NDARecordEvent("capture.bitmap"); return nil }
-        let width = Int(ceil(source.bounds.width * desiredScale))
-        let height = Int(ceil(source.bounds.height * desiredScale))
+        // Reserve actual crop pixels (plus bounded renderer rounding), never full hidden card.
+        let width = Int(ceil(region.sourceRect.width * desiredScale))
+        let height = Int(ceil(region.sourceRect.height * desiredScale))
         let result = admission.admit(NDAAdmissionRequest(token: UUID(),
             tileCount: plan.particles.count, bitmapWidth: width + 2,
             bitmapHeight: height + 2), at: CACurrentMediaTime())
         for lease in result.expiredLeases { destroy(lease.id) }
         guard case .accepted(let lease) = result.decision else { NDARecordEvent("capture.capacity"); return nil }
-        guard let image = NDACaptureView(source, desiredScale), let cgImage = image.cgImage,
-              cgImage.width <= width + 2, cgImage.height <= height + 2 else {
+        let epoch = cancellationEpoch
+        guard let image = NDACaptureRegion(source, region.sourceRect, desiredScale), let cgImage = image.cgImage,
+              cgImage.width == width, cgImage.height == height,
+              cancellationEpoch == epoch, admission.activeLeases.contains(where: { $0.id == lease.id }),
+              NDASettings.enabled, !UIAccessibility.isReduceMotionEnabled, hostVisible(window),
+              source.bounds == region.sourceBounds,
+              region.isCaptureValid(source: source, surface: surface, window: window),
+              case .accepted(let checked) = NDAVisibleRegionPlanner.resolve(source, through: surface, window: window),
+              let checkedAligned = checked.inwardAligned(scale: desiredScale, source: source, surface: surface),
+              checkedAligned.sourceRect == region.sourceRect,
+              checkedAligned.surfaceRect == region.surfaceRect,
+              checkedAligned.clipRect == region.clipRect else {
             admission.release(lease)
             NDARecordEvent("capture.bitmap")
             return nil
         }
-        let container = NDAEffectSurface(frame: surface.bounds)
-        // UIScrollView bounds may have a nonzero contentOffset. Preserve that
-        // coordinate origin rather than adding the offset a second time.
-        container.bounds = surface.bounds
+        let container = NDAEffectSurface(frame: region.clipRect)
+        // Keep list-local coordinates, but clip particle travel to the entire chain's
+        // shared allowed viewport. No concealed source pixels exist in the crop texture.
+        container.bounds = region.clipRect
         container.isUserInteractionEnabled = false
         container.backgroundColor = .clear
         container.clipsToBounds = true
@@ -131,10 +149,11 @@ final class NDAAnimator {
         }
         CATransaction.commit()
         let handle = NDAEffectHandle(lease: lease, container: container,
-                                     surface: surface, frame: frame, plan: plan)
+                                     surface: surface, region: region, plan: plan)
         handle.source = source
         handles[lease.id] = handle
         startTimer()
+        NDARecordRegionPrepared(source, region.sourceRect, region.surfaceRect, region.clipRect, region.partial)
         NDARecordEvent("capture.prepared")
         return handle
     }
@@ -148,7 +167,8 @@ final class NDAAnimator {
             NDARecordEvent("commit.surface"); destroy(handle.lease.id); return
         }
         // A synchronous return alone is not a successful visual removal.
-        guard handle.source?.isDescendant(of: surface) != true else {
+        guard handle.source?.isDescendant(of: surface) != true,
+              handle.source?.window == nil else {
             NDARecordEvent("commit.source_attached"); destroy(handle.lease.id); return
         }
         guard surface.window === handle.window, validSurface(handle) else {
@@ -191,16 +211,31 @@ final class NDAAnimator {
         CATransaction.commit()
     }
 
-    /// Fail closed exactly as before; diagnostics contain only the first failure.
-    private func visibleSource(_ source: UIView, through surface: UIView, window: UIWindow) -> Bool {
-        guard let failure = NDAAncestorGate.failure(source, through: surface, window: window) else { return true }
-        if let geometry = failure.clipping {
-            NDARecordClippingFailure(source, failure.view, failure.depth, failure.effectiveAlpha,
-                geometry.sourceBounds, geometry.sourceInAncestor, geometry.ancestorBounds)
-        } else {
-            NDARecordAncestorFailure(failure.reason.event, failure.view, failure.depth, failure.effectiveAlpha)
+    /// Full chain is inspected even after a partial clip, so a later mask/hidden
+    /// ancestor can never be skipped by accepting the first local intersection.
+    private func visibleSource(_ source: UIView, through surface: UIView, window: UIWindow) -> NDAVisibleRegion? {
+        switch NDAVisibleRegionPlanner.resolve(source, through: surface, window: window) {
+        case .accepted(let region): return region
+        case .rejected(let failure):
+            if let geometry = failure.clipping {
+                NDARecordClippingFailure(source, failure.view, failure.depth, failure.effectiveAlpha,
+                    geometry.sourceBounds, geometry.sourceInAncestor, geometry.ancestorBounds)
+            } else {
+                NDARecordAncestorFailure(failure.reason.event, failure.view, failure.depth, failure.effectiveAlpha)
+            }
+            return nil
         }
-        return false
+    }
+
+    private func captureScale(area: CGFloat, nativeScale: CGFloat) -> CGFloat {
+        guard area.isFinite, area > 0, nativeScale.isFinite, nativeScale > 0 else { return 0 }
+        // Binary scales keep pixel extents exact without renderer edge expansion.
+        var scale: CGFloat = 2
+        for _ in 0..<32 {
+            if scale <= nativeScale && area * scale * scale <= 218_000 { return scale }
+            scale /= 2
+        }
+        return 0
     }
 
     private func hostVisible(_ window: UIWindow) -> Bool {
@@ -224,7 +259,8 @@ final class NDAAnimator {
               surface.window === window, !surface.isHidden, surface.alpha > 0.01,
               !window.isHidden,
               hostVisible(window),
-              surface.bounds == handle.surfaceBounds else { return false }
+              surface.bounds == handle.surfaceBounds,
+              handle.region.isValid(surface: surface, window: window) else { return false }
         var parent: UIView? = surface
         var effectiveAlpha: CGFloat = 1
         while let view = parent {
@@ -266,6 +302,7 @@ final class NDAAnimator {
 
     func cancelAll() {
         guard Thread.isMainThread else { return }
+        cancellationEpoch &+= 1
         for id in Array(handles.keys) { destroy(id) }
         admission.cancelAll()
     }

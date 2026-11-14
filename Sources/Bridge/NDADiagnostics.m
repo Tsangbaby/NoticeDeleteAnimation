@@ -9,6 +9,7 @@ static NSMutableDictionary<NSString *, NSNumber *> *counts;
 static NSString *last;
 static NSString *lastAncestor;
 static NSString *lastClipping;
+static NSString *lastRegion;
 static BOOL pending;
 static void NDAInitializeDiagnostics(void) {
     static dispatch_once_t once;
@@ -23,7 +24,7 @@ static void NDAInitializeDiagnostics(void) {
             @"cell.missing", @"cell.duplicate", @"cell.controller", @"cell.request_mismatch", @"cell.source", @"cell.exception",
             @"capture.enter", @"capture.disabled", @"capture.reduce_motion", @"capture.window", @"capture.scene",
             @"capture.geometry", @"capture.ancestors", @"capture.capacity", @"capture.plan", @"capture.bitmap",
-            @"capture.prepared", @"commit.failed", @"commit.source_attached", @"commit.surface", @"commit.shown"
+            @"capture.prepared", @"capture.partial", @"capture.full", @"commit.failed", @"commit.source_attached", @"commit.surface", @"commit.shown"
         ]];
         [keys unionSet:ancestorCodes];
         allowed = [keys copy];
@@ -68,7 +69,7 @@ void NDARecordAncestorFailure(NSString *code, UIView *view, NSInteger depth, CGF
     NDAInitializeDiagnostics();
     if (!NSThread.isMainThread || ![ancestorCodes containsObject:code]) return;
     NSString *record = NDAAncestorRecord(code, view, depth, effectiveAlpha, view.bounds);
-    @synchronized(allowed) { lastAncestor = record; lastClipping = nil; }
+    @synchronized(allowed) { lastAncestor = record; lastClipping = nil; lastRegion = nil; }
     NDARecordEvent(code);
 }
 
@@ -142,8 +143,25 @@ void NDARecordClippingFailure(UIView *source, UIView *view, NSInteger depth, CGF
         NDASystemClass(source), valid, clamped, (long)contains, (long)overlap,
         sourceText, ancestorText, convertedText, intersectionText, edgeText];
     NSString *record = NDAAncestorRecord(@"ancestor.clipping", view, depth, effectiveAlpha, ancestorBounds);
-    @synchronized(allowed) { lastAncestor = record; lastClipping = geometry; }
+    @synchronized(allowed) { lastAncestor = record; lastClipping = geometry; lastRegion = nil; }
     NDARecordEvent(@"ancestor.clipping");
+}
+
+void NDARecordRegionPrepared(UIView *source, CGRect sourceRect, CGRect surfaceRect, CGRect clipRect, BOOL partial) {
+    NDAInitializeDiagnostics();
+    if (!NSThread.isMainThread) return;
+    BOOL clamped = NO;
+    BOOL valid = NDAFiniteRect(sourceRect) && NDAFiniteRect(surfaceRect) && NDAFiniteRect(clipRect) &&
+        !CGRectIsEmpty(sourceRect) && !CGRectIsEmpty(surfaceRect) && !CGRectIsEmpty(clipRect) &&
+        CGRectContainsRect(clipRect, surfaceRect);
+    NSString *sourceText = NDAGeometryRect(sourceRect, &clamped);
+    NSString *surfaceText = NDAGeometryRect(surfaceRect, &clamped);
+    NSString *clipText = NDAGeometryRect(clipRect, &clamped);
+    NSString *record = [NSString stringWithFormat:
+        @"Prepared region: source_class=%@ partial=%d valid=%d clamped=%d\nsource_crop=%@\nsurface_crop=%@\nsafe_clip=%@",
+        NDASystemClass(source), partial, valid, clamped, sourceText, surfaceText, clipText];
+    @synchronized(allowed) { lastRegion = record; lastAncestor = nil; lastClipping = nil; }
+    NDARecordEvent(partial ? @"capture.partial" : @"capture.full");
 }
 
 // Fixed-key accumulator schedules at most one pending main-thread flush.
@@ -161,18 +179,21 @@ void NDARecordEvent(NSString *code) {
         NSString *lastEvent;
         NSString *ancestor;
         NSString *clipping;
+        NSString *region;
         @synchronized(allowed) {
             snapshot = [counts copy];
             lastEvent = last;
             ancestor = lastAncestor;
             clipping = lastClipping;
+            region = lastRegion;
             pending = NO;
         }
         NSMutableArray<NSString *> *lines = [NSMutableArray arrayWithObjects:
-            @"NoticeDeleteAnimation alpha6", [NSString stringWithFormat:@"SpringBoard PID: %d", NSProcessInfo.processInfo.processIdentifier],
+            @"NoticeDeleteAnimation alpha7", [NSString stringWithFormat:@"SpringBoard PID: %d", NSProcessInfo.processInfo.processIdentifier],
             [@"Last event: " stringByAppendingString:lastEvent], nil];
         if (ancestor) [lines addObject:ancestor];
         if (clipping) [lines addObject:clipping];
+        if (region) [lines addObject:region];
         for (NSString *key in [[snapshot allKeys] sortedArrayUsingSelector:@selector(compare:)]) {
             [lines addObject:[NSString stringWithFormat:@"%@: %@", key, snapshot[key]]];
         }

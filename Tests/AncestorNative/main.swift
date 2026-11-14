@@ -97,7 +97,7 @@ struct AncestorNativeTests {
         RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.8))
         let domain = "com.tsangbaby.noticedeleteanimation" as CFString
         let summary = CFPreferencesCopyAppValue("DiagnosticsSummary" as CFString, domain) as? String ?? ""
-        check(summary.contains("NoticeDeleteAnimation alpha6"), "production version label")
+        check(summary.contains("NoticeDeleteAnimation alpha7"), "production version label")
         check(summary.contains("class=non-system depth=64 alpha_permille=-1"), "class privacy and numeric bounds")
         check(summary.contains("width=4096 height=4096"), "geometry clamped")
         check(!summary.contains("PRIVATE") && !summary.contains("SensitiveView") && !summary.contains("invalid"), "no arbitrary metadata or content")
@@ -108,6 +108,7 @@ struct AncestorNativeTests {
         let systemSummary = CFPreferencesCopyAppValue("DiagnosticsSummary" as CFString, domain) as? String ?? ""
         check(systemSummary.contains("class=UIView depth=1 alpha_permille=1000"), "system class and lower depth clamp")
         runGeometryWriterCases()
+        runPreparedWriterCases()
         for key in categoryCounts.keys.sorted() {
             print("CATEGORY \(key): \(categoryCounts[key]!) checks")
         }
@@ -482,5 +483,34 @@ extension AncestorNativeTests {
               "legacy ancestor writer clears geometry even for clipping reason")
         check(summary.components(separatedBy: "Last ancestor:").count == 2 && summary.count < 6000,
               "clear keeps one bounded most-recent ancestor record")
+    }
+}
+
+extension AncestorNativeTests {
+    static func runPreparedWriterCases() {
+        category = "writer.prepared-region"
+        let source = SensitiveView()
+        source.accessibilityLabel = "PRIVATE-NOTIFICATION-TEXT"
+        NDARecordRegionPrepared(source, CGRect(x: 183, y: 0, width: 187, height: 80),
+            CGRect(x: 0, y: 521, width: 187, height: 80),
+            CGRect(x: 0, y: 0, width: 390, height: 844), true)
+        var summary = flushedSummary()
+        check(summary.contains("Prepared region: source_class=non-system partial=1 valid=1 clamped=0"), "bounded private prepared crop header")
+        check(line(summary, "source_crop=(183.00,0.00,187.00,80.00)") &&
+              line(summary, "surface_crop=(0.00,521.00,187.00,80.00)") &&
+              line(summary, "safe_clip=(0.00,0.00,390.00,844.00)"), "prepared crop is not a restored card")
+        check(!summary.contains("PRIVATE") && !summary.contains("SensitiveView") &&
+              !summary.contains("Last ancestor:") && !summary.contains("Clip geometry:"), "prepared record clears stale failure without content")
+        check(summary.components(separatedBy: "Prepared region:").count == 2 && summary.count < 6000,
+              "exactly one bounded prepared record")
+        NDARecordRegionPrepared(UIView(), CGRect(x: 0, y: 0, width: 10, height: 10),
+            CGRect(x: 5, y: 6, width: 10, height: 10), CGRect(x: 0, y: 0, width: 40, height: 40), false)
+        summary = flushedSummary()
+        check(summary.contains("source_class=UIView partial=0 valid=1") && summary.contains("capture.full:"),
+              "full-source event is fixed allowlist only")
+        NDARecordAncestorFailure("ancestor.mask", UIView(), 3, 1)
+        summary = flushedSummary()
+        check(summary.contains("Last ancestor: ancestor.mask") && !summary.contains("Prepared region:"),
+              "new rejection clears stale prepared metadata")
     }
 }

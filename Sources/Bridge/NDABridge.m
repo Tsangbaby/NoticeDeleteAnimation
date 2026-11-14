@@ -140,22 +140,6 @@ static void NDAListRemoval2(id self, SEL cmd, NSUInteger index, BOOL animated) {
     } @finally { if (handle) finishEffect(handle, success); }
 }
 
-UIImage *NDACaptureView(UIView *view, CGFloat scale) {
-    if (!NSThread.isMainThread || !isfinite(scale) || scale <= 0 || scale > 2) return nil;
-    @try {
-        UIGraphicsImageRendererFormat *format = [UIGraphicsImageRendererFormat preferredFormat];
-        format.scale = scale;
-        format.opaque = NO;
-        format.preferredRange = UIGraphicsImageRendererFormatRangeStandard;
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:view.bounds.size format:format];
-        __block BOOL drawn = NO;
-        UIImage *image = [renderer imageWithActions:^(__unused UIGraphicsImageRendererContext *context) {
-            drawn = [view drawViewHierarchyInRect:(CGRect){CGPointZero, view.bounds.size} afterScreenUpdates:NO];
-        }];
-        return drawn ? image : nil;
-    } @catch (__unused NSException *exception) { return nil; }
-}
-
 BOOL NDAInstallHooks(NDAPrepareEffect prepare, NDAFinishEffect finish) {
     static BOOL topInstalled = NO, groupInstalled = NO, twoInstalled = NO, threeInstalled = NO;
     if (!NSThread.isMainThread || !prepare || !finish) return NO;
