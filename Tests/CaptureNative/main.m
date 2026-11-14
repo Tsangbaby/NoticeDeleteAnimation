@@ -164,11 +164,19 @@ static void VerifyPattern(UIImage *image, CGRect region, CGRect bounds, CGFloat 
             reds += red; greens += green; blues += blue; expectedRed += color == 0;
             BOOL matches = color == 0 ? red : (color == 1 ? green : blue);
             mismatches += !matches;
+            if (!matches && mismatches <= 8) {
+                fprintf(stdout, "PIXEL mismatch x=%zu y=%zu expected=%d rgba=%u,%u,%u,%u source_local=%.4f,%.4f\n",
+                    x, y, color, p[0], p[1], p[2], p[3], (double)localX, (double)localY);
+            }
             if (y == 0) topMatches += matches;
             if (y == h - 1) bottomMatches += matches;
             if ((x == 0 || x == w - 1) && (y == 0 || y == h - 1)) cornerMatches += matches;
         }
     }
+    fprintf(stdout, "PIXEL crop=%.4f,%.4f,%.4f,%.4f bounds=%.4f,%.4f scale=%.4f pixels=%zux%zu mismatch=%zu colors=%zu,%zu,%zu maxred=%u\n",
+        (double)region.origin.x, (double)region.origin.y, (double)region.size.width, (double)region.size.height,
+        (double)bounds.origin.x, (double)bounds.origin.y, (double)scale, w, h, mismatches, reds, greens, blues, maximumRed);
+    fflush(stdout);
     free(pixels);
     Require(mismatches == 0, "all pixels match independently computed source-local pattern");
     Require(topMatches == w && bottomMatches == w && cornerMatches == 4, "first/last rows and all four corners");

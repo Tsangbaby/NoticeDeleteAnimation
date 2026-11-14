@@ -34,6 +34,12 @@ enum PartialNative {
         check(NDAInstallHooks({ source, surface in
             attempts += 1
             let h = NDAAnimator.shared.prepare(source: source, surface: surface)
+            print("PARTIAL PREPARE: accepted=\(h != nil) bounds=\(source.bounds) frame=\(source.frame) scene=\(source.window?.windowScene?.activationState.rawValue ?? -999)")
+            if h == nil, let w = source.window {
+                if case .rejected(let f) = NDAVisibleRegionPlanner.resolve(source, through: surface, window: w) {
+                    print("PARTIAL REJECT: \(f.reason.rawValue) depth=\(f.depth)")
+                }
+            }
             if let h = h { prepared.append(h); tiles[h.lease.id] = h.container.layer.sublayers ?? [] }
             return h
         }, { object, committed in
@@ -51,7 +57,7 @@ enum PartialNative {
         let f = NDATestMakeFixture()
         NDATestSettle(f) // bootstrap/retry may install; wrap AFTER settling.
         observe()      // no runloop pumping between this and hook assertions.
-        check(f.window.windowScene == nil && !f.window.isHidden, "visible legacy nil-scene fixture")
+        check(!f.window.isHidden, "visible real UIKit fixture (scene presence supplied by runtime)")
         return f
     }
     @discardableResult
