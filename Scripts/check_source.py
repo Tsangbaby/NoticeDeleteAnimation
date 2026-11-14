@@ -114,7 +114,7 @@ class SourceContracts(unittest.TestCase):
         factory = (prefs / 'NDAPreferencesBridge.m').read_text()
         self.assertIn('general, enabled, diagnostics, refresh, privacy, nil', factory)
 
-    def test_alpha5_production_gate_and_metadata(self):
+    def test_production_gate_and_metadata(self):
         gate = (ROOT / 'Sources/Tweak/AncestorGate.swift').read_text()
         animator = (ROOT / 'Sources/Tweak/Animator.swift').read_text()
         writer = (ROOT / 'Sources/Bridge/NDADiagnostics.m').read_text()
@@ -131,11 +131,42 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('name.length > 80', writer)
         self.assertIn('/System/Library/', writer)
         self.assertIn('[ancestorCodes containsObject:code]', writer)
-        self.assertIn('NoticeDeleteAnimation alpha5', writer)
+        self.assertIn('NoticeDeleteAnimation alpha6', writer)
         self.assertNotIn('view.description', writer)
         bridge = (ROOT / 'Sources/Bridge/NDABridge.m').read_text()
         for variant in ('2', '3'):
             self.assertEqual(bridge.count('originalListRemoval' + variant + '(self, cmd, index, handle ? NO : animated'), 1)
+
+    def test_alpha6_geometry_uses_unchanged_predicate_operands(self):
+        gate = (ROOT / 'Sources/Tweak/AncestorGate.swift').read_text()
+        writer = (ROOT / 'Sources/Bridge/NDADiagnostics.m').read_text()
+        animator = (ROOT / 'Sources/Tweak/Animator.swift').read_text()
+        header = (ROOT / 'Sources/Bridge/NDABridge.h').read_text()
+        self.assertIn('let sourceBounds = source.bounds', gate)
+        self.assertIn('let ancestorBounds = view.bounds', gate)
+        self.assertIn('let rect = source.convert(sourceBounds, to: view)', gate)
+        self.assertIn('!ancestorBounds.insetBy(dx: -0.5, dy: -0.5).contains(rect)', gate)
+        self.assertIn('sourceBounds: sourceBounds, sourceInAncestor: rect, ancestorBounds: ancestorBounds', gate)
+        self.assertIn('NDARecordClippingFailure', header)
+        self.assertIn('geometry.sourceBounds, geometry.sourceInAncestor, geometry.ancestorBounds', animator)
+        for field in ('source_bounds=', 'ancestor_bounds=', 'source_in_ancestor=',
+                      'local_intersection=', 'edge_overflow_ltrb=', 'local_overlap_permille=',
+                      'contains_half_pt=', 'clamped='):
+            self.assertIn(field, writer)
+        self.assertIn('MAX(-32768, MIN(32768, value))', writer)
+        self.assertIn('return @"invalid"', writer)
+        self.assertIn('lastClipping = nil', writer)
+        self.assertIn('clipping = lastClipping', writer)
+        for bad in ('NSStringFromCGRect(', 'contentOffset =', 'setClipsToBounds:', 'CGRectOffset('):
+            self.assertNotIn(bad, writer)
+        self.assertNotIn('CSScrollView', gate)
+        self.assertNotIn('contentOffset', gate)
+        harness = (ROOT / 'Scripts/test_ancestors_native.sh').read_text()
+        self.assertIn('1e6b54ed910cc307103698af0224e26667a32caa', harness)
+        self.assertIn('73efa1ada05f13d0d8950e673406136794c7855f5b8b7ffe613e9dc0b9b72356', harness)
+        self.assertIn('"$work/alpha5-baseline.swift"', harness)
+        self.assertIn('exit 1', harness)
+        self.assertNotIn('exit 0', harness)
 
     def test_no_persistence_or_content_logging(self):
         for path in list((ROOT / 'Sources').rglob('*.swift')) + list((ROOT / 'Sources').rglob('*.m')):

@@ -7,11 +7,19 @@ enum NDAAncestorReason: String, CaseIterable {
     case hidden, alpha, transform, sublayer, mask, animations, clipping, depth, hierarchy
     var event: String { "ancestor." + rawValue }
 }
+/// Immutable operands from the precise production clipping predicate.
+/// Kept only on a rejection; no later coordinate conversion or view mutation.
+struct NDAClippingGeometry {
+    let sourceBounds: CGRect
+    let sourceInAncestor: CGRect
+    let ancestorBounds: CGRect
+}
 struct NDAAncestorFailure {
     let reason: NDAAncestorReason
     let view: UIView
     let depth: Int
     let effectiveAlpha: CGFloat
+    let clipping: NDAClippingGeometry?
 }
 enum NDAAncestorGate {
     static func supportedTransform(_ transform: CATransform3D) -> Bool {
@@ -29,8 +37,10 @@ enum NDAAncestorGate {
         var effectiveAlpha: CGFloat = 1
         var depth = 0
         var last = source
-        func reject(_ reason: NDAAncestorReason, _ view: UIView) -> NDAAncestorFailure {
-            NDAAncestorFailure(reason: reason, view: view, depth: depth, effectiveAlpha: effectiveAlpha)
+        func reject(_ reason: NDAAncestorReason, _ view: UIView,
+                    clipping: NDAClippingGeometry? = nil) -> NDAAncestorFailure {
+            NDAAncestorFailure(reason: reason, view: view, depth: depth,
+                effectiveAlpha: effectiveAlpha, clipping: clipping)
         }
         while let view = current, depth < 64 {
             depth += 1
@@ -43,8 +53,13 @@ enum NDAAncestorGate {
             if view.layer.mask != nil { return reject(.mask, view) }
             if !(view.layer.animationKeys() ?? []).isEmpty { return reject(.animations, view) }
             if view.clipsToBounds {
-                let rect = source.convert(source.bounds, to: view)
-                if !view.bounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) { return reject(.clipping, view) }
+                let sourceBounds = source.bounds
+                let rect = source.convert(sourceBounds, to: view)
+                let ancestorBounds = view.bounds
+                if !ancestorBounds.insetBy(dx: -0.5, dy: -0.5).contains(rect) {
+                    return reject(.clipping, view, clipping: NDAClippingGeometry(
+                        sourceBounds: sourceBounds, sourceInAncestor: rect, ancestorBounds: ancestorBounds))
+                }
             }
             if view === surface { reachedSurface = true }
             if view === window { return reachedSurface ? nil : reject(.hierarchy, view) }

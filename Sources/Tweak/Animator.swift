@@ -194,7 +194,12 @@ final class NDAAnimator {
     /// Fail closed exactly as before; diagnostics contain only the first failure.
     private func visibleSource(_ source: UIView, through surface: UIView, window: UIWindow) -> Bool {
         guard let failure = NDAAncestorGate.failure(source, through: surface, window: window) else { return true }
-        NDARecordAncestorFailure(failure.reason.event, failure.view, failure.depth, failure.effectiveAlpha)
+        if let geometry = failure.clipping {
+            NDARecordClippingFailure(source, failure.view, failure.depth, failure.effectiveAlpha,
+                geometry.sourceBounds, geometry.sourceInAncestor, geometry.ancestorBounds)
+        } else {
+            NDARecordAncestorFailure(failure.reason.event, failure.view, failure.depth, failure.effectiveAlpha)
+        }
         return false
     }
 
