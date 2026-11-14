@@ -121,6 +121,20 @@ extension PartialNative {
             NDAAnimator.shared.finish(h, committed: true); destroyed(h)
             trace(f, three: three, nested: nested, animated: false)
         }
+        do {
+            let f = fresh()
+            f.source!.bounds.origin.x = -10.1
+            NDATestSettle(f); observe()
+            check(!invoke(f), "decimal-origin production planner/capture/commit")
+            trace(f, animated: false)
+            let h = handle(), ts = tiles[h.lease.id]!
+            check(h.committed && h.region.sourceRect.width == 187 && h.region.sourceRect.height == 80,
+                  "decimal origin retains exact visible187x80 region")
+            check(NDATestBackingSize(ts[0]) == CGSize(width: 374, height: 160),
+                  "decimal-origin actual backing374x160")
+            check(NDATestNoHiddenRed(ts[0]), "decimal-origin actual crop has no hidden-side red")
+            NDAAnimator.shared.cancelAll(); destroyed(h)
+        }
         for action: NDATestAction in [.keepAttached, .reparentSource, .surfaceBounds, .ancestorBounds, .reparentSurface] {
             let f = fresh()
             check(!invoke(f, action: action), "commit rejection original returned once")

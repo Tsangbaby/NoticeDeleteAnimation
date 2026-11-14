@@ -135,8 +135,9 @@ struct NDAVisibleRegion {
         if origin.y + bottom / scale > sourceRect.maxY { bottom -= 1 }
         for _ in 0..<4 {
             let x = origin.x + left / scale, y = origin.y + top / scale
-            let maxX = origin.x + right / scale, maxY = origin.y + bottom / scale
-            let crop = CGRect(x: x, y: y, width: maxX - x, height: maxY - y)
+            // Use index differences for extent: subtracting two absolute decimal
+            // coordinates can turn 374 exact pixels into 373.99999999999994.
+            let crop = CGRect(x: x, y: y, width: (right - left) / scale, height: (bottom - top) / scale)
             let pixelsWide = crop.width * scale, pixelsHigh = crop.height * scale
             // Match the cropped renderer exactly: never let bitmap rounding
             // expand a non-integral extent, or admit a dimension/budget it rejects.
@@ -277,7 +278,9 @@ enum NDAVisibleRegionPlanner {
                 !effectiveAlpha.isFinite || effectiveAlpha < 0.99 || view.alpha > 1 || view.layer.opacity > 1 {
                 return rejected(.alpha, source: source, node: node)
             }
-            if !supported(view.layer.transform) { return rejected(.transform, source: source, node: node) }
+            if !supported(view.layer.transform) || view.layer.isGeometryFlipped {
+                return rejected(.transform, source: source, node: node)
+            }
             if !CATransform3DIsIdentity(view.layer.sublayerTransform) {
                 return rejected(.sublayer, source: source, node: node)
             }

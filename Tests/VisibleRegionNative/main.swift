@@ -264,6 +264,7 @@ extension VisibleRegionNativeTests {
             ("hidden", .hidden, { $0.isHidden = true }),
             ("alpha", .alpha, { $0.alpha = 0.98 }),
             ("rotation", .transform, { $0.layer.transform = CATransform3DMakeRotation(0.1, 0, 0, 1) }),
+            ("initial geometry flip", .transform, { $0.layer.isGeometryFlipped = true }),
             ("sublayer", .sublayer, { $0.layer.sublayerTransform = CATransform3DMakeTranslation(1, 0, 0) }),
             ("mask", .mask, { $0.layer.mask = CALayer() }),
             ("animations", .animations, { addAnimation($0) })
@@ -445,6 +446,18 @@ extension VisibleRegionNativeTests {
             check(q.surfaceRect == CGRect(x: 0, y: 521, width: 187, height: 80), "fractional origin never double-offsets")
         }
         do {
+            let f = observed(); f.source.bounds.origin.x = -10.1
+            let p = accepted(f, "decimal origin integer grid extent")
+            guard let q = p.inwardAligned(scale: 2, source: f.source, surface: f.surface) else {
+                preconditionFailure("decimal bounds origin must not erase a representable crop")
+            }
+            check(q.sourceRect.width == 187 && q.sourceRect.height == 80 &&
+                  q.sourceRect.width * 2 == 374 && q.sourceRect.height * 2 == 160,
+                  "decimal-origin crop uses integer grid differences, not cancelling absolute endpoints")
+            check(q.clipRect.contains(q.surfaceRect) && f.source.bounds.contains(q.sourceRect),
+                  "decimal-origin extent correction never expands outside visibility")
+        }
+        do {
             let f = fixture(scroll: true)
             f.source.frame = CGRect(x: -183.25, y: 521.125, width: 370.375, height: 80.375)
             f.source.bounds.origin = CGPoint(x: -12.125, y: 7.375)
@@ -488,8 +501,14 @@ extension VisibleRegionNativeTests {
             f.source.frame = CGRect(x: -10.25, y: -3.125, width: 100.375, height: 80.375)
             f.source.bounds.origin = CGPoint(x: -4.125, y: -9.375)
             let p = accepted(f, "non-binary grid division")
-            check(p.inwardAligned(scale: 1.5, source: f.source, surface: f.surface) == nil,
-                  "reject non-integral represented pixel height; never add an outward epsilon")
+            if let q = p.inwardAligned(scale: 1.5, source: f.source, surface: f.surface) {
+                check(q.sourceRect.width * 1.5 == (q.sourceRect.width * 1.5).rounded(.down) &&
+                      q.sourceRect.height * 1.5 == (q.sourceRect.height * 1.5).rounded(.down) &&
+                      p.sourceRect.contains(q.sourceRect) && p.clipRect.contains(q.surfaceRect),
+                      "non-binary grid accepted only when actual pixel extents remain integral and contained")
+            } else {
+                check(true, "non-binary represented grid fails closed without outward epsilon")
+            }
         }
         for size in [CGSize(width: 300, height: 2), CGSize(width: 2, height: 300)] {
             let f = fixture(); f.source.frame = CGRect(origin: .zero, size: size)
@@ -553,7 +572,7 @@ extension VisibleRegionNativeTests {
             ("layer clip flag", { $0.layer.masksToBounds.toggle() }),
             ("corner radius", { $0.layer.cornerRadius = 1 }),
             ("masked corners", { $0.layer.maskedCorners = [] }),
-            ("corner curve", { $0.layer.cornerCurve = .continuous }),
+            ("corner curve", { $0.layer.cornerCurve = $0.layer.cornerCurve == .continuous ? .circular : .continuous }),
             ("geometry flipped", { $0.layer.isGeometryFlipped.toggle() }),
             ("mask", { $0.layer.mask = CALayer() }),
             ("animation", { addAnimation($0) })

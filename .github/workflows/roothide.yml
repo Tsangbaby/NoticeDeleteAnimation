@@ -63,12 +63,15 @@ jobs:
         shell: bash
         run: bash Scripts/test_ancestors_native.sh
       - name: Real simulator full-chain visible region regression
+        if: success() || failure()
         shell: bash
         run: bash Scripts/test_visible_region_native.sh
       - name: Real simulator cropped capture pixel regression
+        if: success() || failure()
         shell: bash
         run: bash Scripts/test_capture_native.sh
       - name: Real simulator partial Animator and runtime-shim hook regression
+        if: success() || failure()
         shell: bash
         run: bash Scripts/test_partial_native.sh
       - name: Compile and package arm64 plus arm64e
