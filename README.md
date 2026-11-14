@@ -7,12 +7,12 @@ Swift 编写的系统通知删除粒子消散插件源码候选。
 | 插件名 | NoticeDeleteAnimation |
 | Package | com.tsangbaby.noticedeleteanimation |
 | Author / Maintainer | Tsangbaby |
-| 源码版本 | 0.1.0-alpha1 |
+| 源码版本 | 0.1.0-alpha2 |
 | 最低 deployment target | iOS 15.0 |
 | 架构目标 | arm64 / arm64e |
 | 注入目标 | 仅 SpringBoard |
 
-**这是已写源码、尚未原生编译和真机验收的候选，不是已验证可用的 DEB。** iOS 15.0+ 是目标范围，不表示已经逐版本实测；没有最高系统版本硬拦截。私有接口不匹配时保留系统行为。
+**alpha1 已通过云端原生构建，但用户在 RootHide iOS16.0.3 安装并注销后反馈无效果。alpha2 是诊断修复候选，不是已证实解决设备问题的版本。** iOS 15.0+ 是目标范围，不表示已经逐版本实测；没有最高系统版本硬拦截。私有接口不匹配时保留系统行为。具体构建证据及真机边界见 `Docs/`。
 
 ## 效果与范围
 
@@ -57,12 +57,12 @@ python3 Scripts/check_source.py
 
 ## 安全与开关
 
-- 默认启用；每次删除读取 `com.tsangbaby.noticedeleteanimation` 域下布尔 `Enabled`。没有设置页注入，没有依赖私有 Preferences framework。
-- 在**越狱设备终端**使用可用的偏好工具设置该布尔值；例如系统提供 `defaults` 时，`defaults write com.tsangbaby.noticedeleteanimation Enabled -bool false`。此命令不在 Minis/iSH 运行，不保证所有越狱都提供该 CLI。
+- 默认启用；设置 → NoticeDeleteAnimation 提供启用开关和诊断，读取相同的 `com.tsangbaby.noticedeleteanimation` 偏好域。主插件不依赖 Preferences framework，独立 Swift 设置包依赖 Preferences/PreferenceLoader。
+- 开关下一次删除生效，无需为了改开关再次注销。诊断刷新可显示 SpringBoard PID、更新时间及固定故障码计数；这些值是上次插件成功写入的状态，不把旧时间戳当成当前加载成功的证明。
 - 开启“减弱动态效果”、资源预算不足、快照失败、ABI 缺失时，保留系统移除。录屏不会单独禁用效果，仍遵循原通知表面的可见性。
 - 不记录通知正文、不保存图片、不上传数据。不创建全局覆盖窗口；效果附着于原通知列表，失去表面/窗口/前台、滚动或旋转改变 bounds、内存警告等都会回收。
 - 不延后删除、不重插通知；原系统删除调用恰好一次。仅成功准备的现代列表卡片关闭原卡退场动画，保留系统布局补位。
 
 ## 停止点
 
-本次仅交付源码和本地验证记录。未 commit/push、未启用 CI、未产出安装包、未连接或操作设备。下一步由用户决定。
+本轮修复保持在新分支，按既有授权推送至用户公开仓库并构建 RootHide 测试包。未连接或操作设备，安装、注销和真机验收由用户进行。历史首版验证记录保留于 Docs，不替代 alpha2 的实际构建结果。

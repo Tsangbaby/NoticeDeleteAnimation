@@ -6,7 +6,9 @@ import json
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
-output = root.parent / 'NoticeDeleteAnimation-0.1.0-alpha1-source.zip'
+version = next(line.split(': ', 1)[1].strip() for line in (root / 'control').read_text().splitlines()
+               if line.startswith('Version: ')).replace('~', '-')
+output = root.parent / f'NoticeDeleteAnimation-{version}-source.zip'
 files = sorted(p for p in root.rglob('*') if p.is_file() and
                not any(part in {'.git', '.build', '.theos', '__pycache__', 'packages'}
                        for part in p.relative_to(root).parts) and p.name != 'SOURCE-MANIFEST.json')

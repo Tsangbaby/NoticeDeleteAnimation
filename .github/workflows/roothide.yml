@@ -2,7 +2,7 @@ name: RootHide source build
 on:
   workflow_dispatch:
   push:
-    branches: ['build/**']
+    branches: ['build/**', 'fix/ios16-diagnostics-alpha2']
 permissions:
   contents: read
 jobs:
@@ -65,6 +65,7 @@ jobs:
           dpkg-deb --contents "${debs[0]}" > build-evidence/contents.txt
           dpkg-deb --extract "${debs[0]}" build-evidence/extracted
           python3 Scripts/validate_package.py "${debs[0]}" build-evidence/extracted > build-evidence/package-validation.json
+          python3 Scripts/validate_preferences.py build-evidence/extracted > build-evidence/preferences-validation.json
           dylib="$(python3 -c 'from pathlib import Path; a=list(Path("build-evidence/extracted").rglob("NoticeDeleteAnimation.dylib")); assert len(a)==1; print(a[0])')"
           xcrun lipo -info "$dylib" | tee build-evidence/lipo.txt
           xcrun otool -L "$dylib" > build-evidence/dependencies.txt

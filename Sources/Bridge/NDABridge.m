@@ -57,8 +57,8 @@ static id NDAObjectGetter(id object, NSString *name) {
 
 static id NDAPrepare(UIView *cell, UIView *surface) {
     NDARequestScope *scope = scopes.lastObject;
-    if (!scope || ![cell isKindOfClass:UIView.class] || scope.attempts >= 8 ||
-        [scope.seenViews containsObject:cell]) return nil;
+    if (!scope || ![cell isKindOfClass:UIView.class]) { NDARecordEvent(@"cell.missing"); return nil; }
+    if (scope.attempts >= 8 || [scope.seenViews containsObject:cell]) { NDARecordEvent(@"cell.duplicate"); return nil; }
     [scope.seenViews addObject:cell];
     ++scope.attempts;
     @try {
@@ -66,19 +66,21 @@ static id NDAPrepare(UIView *cell, UIView *surface) {
         // must be IDENTICAL to the specific removeNotificationRequest: argument.
         id controller = NDAObjectGetter(cell, @"notificationViewController");
         if (!controller) controller = NDAObjectGetter(cell, @"contentViewController");
-        if (![controller isKindOfClass:UIViewController.class]) return nil;
+        if (![controller isKindOfClass:UIViewController.class]) { NDARecordEvent(@"cell.controller"); return nil; }
         id request = NDAObjectGetter(controller, @"notificationRequest");
-        if (request != scope.request) return nil;
+        if (request != scope.request) { NDARecordEvent(@"cell.request_mismatch"); return nil; }
         UIView *source = [(UIViewController *)controller viewIfLoaded];
-        if (!source || ![source isDescendantOfView:cell]) return nil;
+        if (!source || ![source isDescendantOfView:cell]) { NDARecordEvent(@"cell.source"); return nil; }
         return prepareEffect(source, surface);
     } @catch (__unused NSException *exception) {
+        NDARecordEvent(@"cell.exception");
         return nil;
     }
 }
 
 static void NDAWithRequest(id self, SEL cmd, id request, void (*original)(id, SEL, id)) {
     if (!NSThread.isMainThread || !request) {
+        NDARecordEvent(NSThread.isMainThread ? @"request.nil" : @"request.off_main");
         original(self, cmd, request);
         return;
     }
@@ -96,21 +98,29 @@ static void NDAWithRequest(id self, SEL cmd, id request, void (*original)(id, SE
     @finally { [scopes removeLastObject]; }
 }
 static void NDARequestRemoval(id self, SEL cmd, id request) {
+    NDARecordEvent(@"request.top");
     NDAWithRequest(self, cmd, request, originalRequestRemoval);
 }
 static void NDAGroupRemoval(id self, SEL cmd, id request) {
+    NDARecordEvent(@"request.group");
     NDAWithRequest(self, cmd, request, originalGroupRemoval);
 }
 
 static id NDAListPrepare(id self, NSUInteger index) {
-    if (!NSThread.isMainThread || !scopes.lastObject) return nil;
+    NDARecordEvent(@"list.enter");
+    if (!NSThread.isMainThread) { NDARecordEvent(@"list.off_main"); return nil; }
+    if (!scopes.lastObject) { NDARecordEvent(@"list.no_scope"); return nil; }
     @try {
         SEL getter = NSSelectorFromString(@"_visibleViewAtIndex:");
         const char *args[] = { @encode(NSUInteger) };
-        if (!NDAHasABI(object_getClass(self), getter, "@", 1, args)) return nil;
+        if (!NDAHasABI(object_getClass(self), getter, "@", 1, args)) {
+            NDARecordEvent(@"list.getter_abi"); return nil;
+        }
         id cell = ((id (*)(id, SEL, NSUInteger))[self methodForSelector:getter])(self, getter, index);
         return NDAPrepare(cell, self);
-    } @catch (__unused NSException *exception) { return nil; }
+    } @catch (__unused NSException *exception) {
+        NDARecordEvent(@"list.getter_exception"); return nil;
+    }
 }
 
 static void NDAListRemoval3(id self, SEL cmd, NSUInteger index, BOOL animated, BOOL displaced) {
@@ -146,33 +156,54 @@ UIImage *NDACaptureView(UIView *view, CGFloat scale) {
     } @catch (__unused NSException *exception) { return nil; }
 }
 
-void NDAInstallHooks(NDAPrepareEffect prepare, NDAFinishEffect finish) {
-    static BOOL installed = NO;
-    if (installed || !NSThread.isMainThread || !prepare || !finish) return;
-    if (![NSBundle.mainBundle.bundleIdentifier isEqualToString:@"com.apple.springboard"]) return;
+BOOL NDAInstallHooks(NDAPrepareEffect prepare, NDAFinishEffect finish) {
+    static BOOL topInstalled = NO, groupInstalled = NO, twoInstalled = NO, threeInstalled = NO;
+    if (!NSThread.isMainThread || !prepare || !finish) return NO;
+    if (![NSBundle.mainBundle.bundleIdentifier isEqualToString:@"com.apple.springboard"]) return NO;
+    prepareEffect = [prepare copy];
+    finishEffect = [finish copy];
+    if (!scopes) scopes = [NSMutableArray array];
     Class structured = NSClassFromString(@"NCNotificationStructuredListViewController");
     Class group = NSClassFromString(@"NCNotificationGroupList");
     const char *objectArgs[] = { "@" };
     SEL requestSelector = NSSelectorFromString(@"removeNotificationRequest:");
     BOOL topRequest = NDAHasABI(structured, requestSelector, "v", 1, objectArgs);
     BOOL groupRequest = NDAHasABI(group, requestSelector, "v", 1, objectArgs);
-    if (!topRequest && !groupRequest) return;
     Class list = NSClassFromString(@"NCNotificationListView");
     const char *threeArgs[] = { @encode(NSUInteger), @encode(BOOL), @encode(BOOL) };
     const char *twoArgs[] = { @encode(NSUInteger), @encode(BOOL) };
+    const char *getterArgs[] = { @encode(NSUInteger) };
     SEL three = NSSelectorFromString(@"removeViewAtIndex:animated:isHorizontallyDisplaced:");
     SEL two = NSSelectorFromString(@"removeViewAtIndex:animated:");
-    BOOL modern3 = [list isSubclassOfClass:UIScrollView.class] && NDAHasABI(list, three, "v", 3, threeArgs);
-    BOOL modern2 = !modern3 && [list isSubclassOfClass:UIScrollView.class] && NDAHasABI(list, two, "v", 2, twoArgs);
-    const char *getterArgs[] = { @encode(NSUInteger) };
-    if ((!modern3 && !modern2) ||
-        !NDAHasABI(list, NSSelectorFromString(@"_visibleViewAtIndex:"), "@", 1, getterArgs)) return;
-    prepareEffect = [prepare copy];
-    finishEffect = [finish copy];
-    scopes = [NSMutableArray array];
-    installed = YES;
-    if (topRequest) MSHookMessageEx(structured, requestSelector, (IMP)NDARequestRemoval, (IMP *)&originalRequestRemoval);
-    if (groupRequest) MSHookMessageEx(group, requestSelector, (IMP)NDAGroupRemoval, (IMP *)&originalGroupRemoval);
-    if (modern3) MSHookMessageEx(list, three, (IMP)NDAListRemoval3, (IMP *)&originalListRemoval3);
-    else if (modern2) MSHookMessageEx(list, two, (IMP)NDAListRemoval2, (IMP *)&originalListRemoval2);
+    BOOL listGetter = [list isSubclassOfClass:UIScrollView.class] &&
+        NDAHasABI(list, NSSelectorFromString(@"_visibleViewAtIndex:"), "@", 1, getterArgs);
+    BOOL modern3 = listGetter && NDAHasABI(list, three, "v", 3, threeArgs);
+    BOOL modern2 = listGetter && NDAHasABI(list, two, "v", 2, twoArgs);
+    if (!topRequest && !groupRequest) NDARecordEvent(@"install.wait_request");
+    if (!modern3 && !modern2) NDARecordEvent(@"install.wait_list");
+    if (topRequest && !topInstalled) {
+        MSHookMessageEx(structured, requestSelector, (IMP)NDARequestRemoval, (IMP *)&originalRequestRemoval);
+        topInstalled = YES; NDARecordEvent(@"install.top");
+    }
+    if (groupRequest && !groupInstalled) {
+        MSHookMessageEx(group, requestSelector, (IMP)NDAGroupRemoval, (IMP *)&originalGroupRemoval);
+        groupInstalled = YES; NDARecordEvent(@"install.group");
+    }
+    // Some releases route different callers through different overloads. Shared
+    // scope.seenViews prevents double capture if these overloads call each other.
+    if (modern3 && !threeInstalled) {
+        MSHookMessageEx(list, three, (IMP)NDAListRemoval3, (IMP *)&originalListRemoval3);
+        threeInstalled = YES; NDARecordEvent(@"install.list3");
+    }
+    if (modern2 && !twoInstalled) {
+        MSHookMessageEx(list, two, (IMP)NDAListRemoval2, (IMP *)&originalListRemoval2);
+        twoInstalled = YES; NDARecordEvent(@"install.list2");
+    }
+    BOOL ready = (topInstalled || groupInstalled) && (twoInstalled || threeInstalled);
+    static BOOL readyAnnounced = NO;
+    if (ready && !readyAnnounced) {
+        readyAnnounced = YES;
+        NDARecordEvent(@"install.ready");
+    }
+    return ready;
 }

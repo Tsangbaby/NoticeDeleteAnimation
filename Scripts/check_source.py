@@ -70,13 +70,43 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('visibleSource(source, through: surface, window: window)', source)
         self.assertIn('handle.source?.isDescendant(of: surface) != true', source)
         self.assertIn('animation.duration = particle.duration', source)
-        self.assertIn('window.windowScene?.activationState == .foregroundActive', source)
+        self.assertIn('hostVisible(window)', source)
+        self.assertIn('NDAHostVisibility.allows(', source)
+        self.assertIn('NDARecordEvent("capture.scene")', source)
         self.assertIn('tile.contents = cgImage', source)
         self.assertIn('$0.contents = nil', source)
         self.assertNotIn('UIWindow(', source)
         self.assertNotIn('source.alpha =', source)
         self.assertNotIn('source.isHidden =', source)
         self.assertNotIn('source.transform =', source)
+
+    def test_diagnostics_are_allowlisted_and_install_is_idempotent(self):
+        diagnostic = (ROOT / 'Sources/Bridge/NDADiagnostics.m').read_text()
+        self.assertIn('[allowed containsObject:code]', diagnostic)
+        self.assertIn('NSEC_PER_SEC / 2', diagnostic)
+        self.assertNotIn('notificationRequest', diagnostic)
+        self.assertNotIn('descriptionWithLocale', diagnostic)
+        bridge = (ROOT / 'Sources/Bridge/NDABridge.m').read_text()
+        for capability in ('top', 'group', 'two', 'three'):
+            self.assertIn('!' + capability + 'Installed', bridge)
+        self.assertNotIn('else if (modern2)', bridge)
+        entry = (ROOT / 'Sources/Tweak/Entry.swift').read_text()
+        self.assertIn('retries >= 60', entry)
+        self.assertIn('timer?.invalidate()', entry)
+
+    def test_settings_registration_and_domain(self):
+        prefs = ROOT / 'Preferences'
+        info = plistlib.loads((prefs / 'Resources/Info.plist').read_bytes())
+        entry = plistlib.loads((ROOT / 'layout/Library/PreferenceLoader/Preferences/NoticeDeleteAnimation.plist').read_bytes())['entry']
+        self.assertEqual(info['NSPrincipalClass'], 'NDASettingsController')
+        self.assertEqual(entry['bundle'], info['CFBundleExecutable'])
+        self.assertEqual(entry['detail'], info['NSPrincipalClass'])
+        self.assertEqual(info['MinimumOSVersion'], '15.0')
+        source = (prefs / 'NDASettingsController.swift').read_text()
+        for key in ('DiagnosticsSummary', 'DiagnosticsUpdated', 'DiagnosticsPID'):
+            self.assertIn(key, source)
+        self.assertIn('com.tsangbaby.noticedeleteanimation', source)
+        self.assertIn('SUBPROJECTS += Preferences', (ROOT / 'Makefile').read_text())
 
     def test_no_persistence_or_content_logging(self):
         for path in list((ROOT / 'Sources').rglob('*.swift')) + list((ROOT / 'Sources').rglob('*.m')):

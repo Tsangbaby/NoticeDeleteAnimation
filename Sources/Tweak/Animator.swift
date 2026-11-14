@@ -55,42 +55,52 @@ final class NDAAnimator {
     }
 
     func prepare(source: UIView, surface: UIView) -> NDAEffectHandle? {
-        guard Thread.isMainThread, NDASettings.enabled,
-              !UIAccessibility.isReduceMotionEnabled, !source.isHidden, source.alpha > 0.01,
-              let window = source.window, surface.window === window,
-              !window.isHidden,
-              window.windowScene?.activationState == .foregroundActive,
-              source.bounds.width > 1, source.bounds.height > 1,
+        guard Thread.isMainThread else { return nil }
+        NDARecordEvent("capture.enter")
+        guard NDASettings.enabled else { NDARecordEvent("capture.disabled"); return nil }
+        guard !UIAccessibility.isReduceMotionEnabled else { NDARecordEvent("capture.reduce_motion"); return nil }
+        guard !source.isHidden, source.alpha > 0.01,
+              let window = source.window, surface.window === window, !window.isHidden else {
+            NDARecordEvent("capture.window"); return nil
+        }
+        guard hostVisible(window) else { NDARecordEvent("capture.scene"); return nil }
+        guard source.bounds.width > 1, source.bounds.height > 1,
               source.bounds.width.isFinite, source.bounds.height.isFinite,
-              source.bounds.width <= 2048, source.bounds.height <= 2048,
-              visibleSource(source, through: surface, window: window) else { return nil }
+              source.bounds.width <= 2048, source.bounds.height <= 2048 else {
+            NDARecordEvent("capture.geometry"); return nil
+        }
+        guard visibleSource(source, through: surface, window: window) else {
+            NDARecordEvent("capture.ancestors"); return nil
+        }
         sweep()
-        guard handles.count < policy.maxConcurrent else { return nil }
+        guard handles.count < policy.maxConcurrent else { NDARecordEvent("capture.capacity"); return nil }
         let frame = source.convert(source.bounds, to: surface)
         guard frame.width.isFinite, frame.height.isFinite,
               frame.origin.x.isFinite, frame.origin.y.isFinite,
               frame.width > 1, frame.height > 1,
               surface.bounds.intersects(frame),
-              // Do not paint already-clipped notifications outside their source viewport.
-              surface.bounds.insetBy(dx: -1, dy: -1).contains(frame) else { return nil }
+              surface.bounds.insetBy(dx: -1, dy: -1).contains(frame) else {
+            NDARecordEvent("capture.geometry"); return nil
+        }
         seed &+= 1
         guard let plan = NDAParticlePlan.make(width: Double(frame.width),
-            height: Double(frame.height), seed: seed, policy: policy) else { return nil }
+            height: Double(frame.height), seed: seed, policy: policy) else { NDARecordEvent("capture.plan"); return nil }
         // Capture at <=2x and <=220k pixels per effect. Reject before allocation if
         // accounting is already full. UIGraphics may ceil each bitmap dimension.
         let desiredScale = min(window.screen.scale, 2,
             sqrt(220_000 / (source.bounds.width * source.bounds.height)))
-        guard desiredScale.isFinite, desiredScale > 0 else { return nil }
+        guard desiredScale.isFinite, desiredScale > 0 else { NDARecordEvent("capture.bitmap"); return nil }
         let width = Int(ceil(source.bounds.width * desiredScale))
         let height = Int(ceil(source.bounds.height * desiredScale))
         let result = admission.admit(NDAAdmissionRequest(token: UUID(),
             tileCount: plan.particles.count, bitmapWidth: width + 2,
             bitmapHeight: height + 2), at: CACurrentMediaTime())
         for lease in result.expiredLeases { destroy(lease.id) }
-        guard case .accepted(let lease) = result.decision else { return nil }
+        guard case .accepted(let lease) = result.decision else { NDARecordEvent("capture.capacity"); return nil }
         guard let image = NDACaptureView(source, desiredScale), let cgImage = image.cgImage,
               cgImage.width <= width + 2, cgImage.height <= height + 2 else {
             admission.release(lease)
+            NDARecordEvent("capture.bitmap")
             return nil
         }
         let container = NDAEffectSurface(frame: surface.bounds)
@@ -125,23 +135,30 @@ final class NDAAnimator {
         handle.source = source
         handles[lease.id] = handle
         startTimer()
+        NDARecordEvent("capture.prepared")
         return handle
     }
 
     func finish(_ handle: NDAEffectHandle, committed: Bool) {
         guard Thread.isMainThread, handles[handle.lease.id] === handle else { return }
-        guard committed, !handle.committed, let surface = handle.surface,
-              // Returning from a remove method is not enough: only present after
-              // the original content has actually left this list hierarchy.
-              handle.source?.isDescendant(of: surface) != true,
-              surface.window === handle.window, validSurface(handle) else {
-            destroy(handle.lease.id)
-            return
+        guard committed, !handle.committed else {
+            NDARecordEvent("commit.failed"); destroy(handle.lease.id); return
+        }
+        guard let surface = handle.surface else {
+            NDARecordEvent("commit.surface"); destroy(handle.lease.id); return
+        }
+        // A synchronous return alone is not a successful visual removal.
+        guard handle.source?.isDescendant(of: surface) != true else {
+            NDARecordEvent("commit.source_attached"); destroy(handle.lease.id); return
+        }
+        guard surface.window === handle.window, validSurface(handle) else {
+            NDARecordEvent("commit.surface"); destroy(handle.lease.id); return
         }
         handle.committed = true
         handle.deadline = CACurrentMediaTime() + handle.plan.totalDuration + 0.10
         surface.addSubview(handle.container)
         handle.container.isHidden = false
+        NDARecordEvent("commit.shown")
         let baseTime = handle.container.layer.convertTime(CACurrentMediaTime(), from: nil)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -210,11 +227,27 @@ final class NDAAnimator {
         return false
     }
 
+    private func hostVisible(_ window: UIWindow) -> Bool {
+        let scene: NDAHostSceneState
+        if let windowScene = window.windowScene {
+            switch windowScene.activationState {
+            case .foregroundActive: scene = .foregroundActive
+            case .foregroundInactive: scene = .foregroundInactive
+            case .background: scene = .background
+            case .unattached: scene = .unattached
+            @unknown default: return false
+            }
+        } else { scene = .absent }
+        return NDAHostVisibility.allows(
+            isSpringBoard: Bundle.main.bundleIdentifier == "com.apple.springboard",
+            windowVisible: !window.isHidden && window.alpha > 0.01, scene: scene)
+    }
+
     private func validSurface(_ handle: NDAEffectHandle) -> Bool {
         guard let surface = handle.surface, let window = handle.window,
               surface.window === window, !surface.isHidden, surface.alpha > 0.01,
               !window.isHidden,
-              window.windowScene?.activationState == .foregroundActive,
+              hostVisible(window),
               surface.bounds == handle.surfaceBounds else { return false }
         var parent: UIView? = surface
         var effectiveAlpha: CGFloat = 1
