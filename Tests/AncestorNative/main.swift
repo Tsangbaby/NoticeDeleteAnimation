@@ -1,6 +1,7 @@
 import UIKit
 import QuartzCore
 import CoreFoundation
+import Darwin
 
 @main
 struct AncestorNativeTests {
@@ -20,6 +21,7 @@ struct AncestorNativeTests {
         return (w, surface, wrapper, source)
     }
     static func main() {
+        setbuf(stdout, nil)
         precondition(Thread.isMainThread)
         check(NDAAncestorReason.allCases.count == 9, "all nine production reasons")
         for reason in NDAAncestorReason.allCases {

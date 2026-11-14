@@ -1,5 +1,6 @@
 #import "NDABridge.h"
 #import <objc/runtime.h>
+#import <TargetConditionals.h>
 #import <math.h>
 
 static NSSet<NSString *> *allowed;
@@ -36,7 +37,13 @@ static NSInteger NDABounded(CGFloat value, CGFloat maximum) {
 static NSString *NDASystemClass(UIView *view) {
     Class cls = object_getClass(view);
     NSString *path = [NSBundle bundleForClass:cls].bundlePath;
-    if (![path hasPrefix:@"/System/Library/"]) return @"non-system";
+    BOOL system = [path hasPrefix:@"/System/Library/"];
+#if TARGET_OS_SIMULATOR
+    // Simulator framework bundle paths include the host's runtime-root prefix.
+    // This normalization is never compiled into the device package.
+    system = system || (path.length && [path rangeOfString:@"/System/Library/"].location != NSNotFound);
+#endif
+    if (!system) return @"non-system";
     NSString *name = NSStringFromClass(cls);
     if (!name.length || name.length > 80) return @"system-other";
     NSCharacterSet *chars = [NSCharacterSet characterSetWithCharactersInString:
