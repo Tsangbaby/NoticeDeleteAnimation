@@ -9,7 +9,7 @@
 
 static NSString *const kNLStatusPlistPath =
     @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
-static NSString *const kNLBuildVersion = @"test14";
+static NSString *const kNLBuildVersion = @"1.0.1+rebuild1";
 
 // 事件键 → 中文说明（顺序与原实现一致）
 static NSArray<NSArray<NSString *> *> *NLEventDescriptions(void)
@@ -121,7 +121,7 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
                            events:(NSDictionary *)events
 {
     if (!status) {
-        return @"设置组件版本：test14\n\n"
+        return @"设置组件版本：1.0.1+rebuild1\n\n"
                 "尚未读到 SpringBoard 运行状态。\n"
                 "安装后请重新载入桌面，回到这里点刷新。若仍没有状态，请检查插件是否已启用 SpringBoard 注入。";
     }
@@ -135,7 +135,7 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
     NSString *loaded = status[@"loaded"] ? @"已加载，等待通知收回" : @"（请重新载入桌面）";
     NSString *updated = status[@"updatedAt"] ? [status[@"updatedAt"] description] : @"未知";
 
-    [out appendFormat:@"设置组件版本：test14\n桌面运行版本：%@%@\n更新：%@\n\n",
+    [out appendFormat:@"设置组件版本：1.0.1+rebuild1\n桌面运行版本：%@%@\n更新：%@\n\n",
                      build, loaded, updated];
 
     [out appendString:@"模式：原生收回时消散\n插件倒计时：已取消\n\n"];

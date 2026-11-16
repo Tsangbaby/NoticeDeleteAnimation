@@ -1,0 +1,89 @@
+name: NoticeListTweak reconstructed RootHide build
+on:
+  workflow_dispatch:
+  push:
+    branches: ['build/noticelist-rebuild-roothide-20261116']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      THEOS: ${{ github.workspace }}/.ci-theos
+      THEOS_PACKAGE_SCHEME: roothide
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Native Apple toolchain and package tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          mkdir -p build-evidence
+          xcodebuild -version | tee build-evidence/xcode.txt
+          xcrun --sdk iphoneos --show-sdk-path | tee build-evidence/sdk.txt
+          git rev-parse HEAD > build-evidence/source-commit.txt
+          for tool in make ldid dpkg xz; do
+            brew list --versions "$tool" >/dev/null 2>&1 || brew install "$tool"
+          done
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Pinned actual RootHide Theos
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --recursive https://github.com/roothide/theos.git "$THEOS"
+          git -C "$THEOS" checkout 958fea4f779943505b15b93c88bb4db8d97b346d
+          git -C "$THEOS" submodule update --init --recursive
+          git -C "$THEOS" rev-parse HEAD > build-evidence/theos-commit.txt
+          git -C "$THEOS" submodule status --recursive > build-evidence/theos-submodules.txt
+          mkdir -p .ci-frameworks/Preferences.framework
+          curl --fail --location --retry 3 'https://raw.githubusercontent.com/theos/sdks/0222fd5413cf4b9af096f37b4621afa2688572f7/iPhoneOS16.5.sdk/System/Library/PrivateFrameworks/Preferences.framework/Preferences.tbd' -o .ci-frameworks/Preferences.framework/Preferences.tbd
+          echo '9daceaff6cf94346594a12f9ef9c2ea23de15475b516f9e33c20871a018c098b  .ci-frameworks/Preferences.framework/Preferences.tbd' | shasum -a 256 -c - | tee build-evidence/preferences-stub.txt
+      - name: Source and embedded shader contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 Scripts/generate_shader.py --check
+          python3 Scripts/source_manifest.py --check
+          python3 Scripts/check_source.py 2>&1 | tee build-evidence/source-checks.txt
+      - name: Native arm64 and arm64e compile and RootHide package
+        shell: bash
+        run: |
+          set -euo pipefail
+          make clean
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide 2>&1 | tee build-evidence/build.txt
+      - name: Actual Metal shader compilation
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash Scripts/test_shader_native.sh 2>&1 | tee build-evidence/shader-native-tests.txt
+      - name: Real UIKit and Preferences source smoke
+        if: success() || failure()
+        shell: bash
+        run: bash Scripts/test_preferences_native.sh
+      - name: Validate actual reconstructed package
+        shell: bash
+        run: |
+          set -euo pipefail
+          debs=(packages/*.deb)
+          test "${#debs[@]}" -eq 1
+          python3 Scripts/validate_package.py "${debs[0]}" build-evidence/extracted > build-evidence/package-validation.json
+          dpkg-deb --field "${debs[0]}" > build-evidence/control.txt
+          dpkg-deb --contents "${debs[0]}" > build-evidence/contents.txt
+          shasum -a 256 "${debs[0]}" > build-evidence/SHA256SUMS
+      - name: Upload package and evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: NoticeListTweak-roothide-${{ github.sha }}
+          path: |
+            packages/*.deb
+            build-evidence/
+          if-no-files-found: error
+          retention-days: 14

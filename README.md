@@ -1,5 +1,7 @@
 # NoticeListTweak 逆向重建工程
 
+> **本分支为上传源码的独立 RootHide 构建候选 `1.0.1+rebuild1`**，不是 NoticeDeleteAnimation alpha7。原始说明保留在下方；本次修正、原生编译验收及未验证行为分别见 [构建计划](Docs/BUILD-REBUILD1.md)、[变更与边界](Docs/REBUILD1-CHANGES.md)。CI 成功不等于目标设备动画已验证。
+
 从 `通知消散 1.0.1~test14` 的已编译 deb 完整重建的可维护源码工程。
 
 ## 目录

@@ -14,6 +14,7 @@
 #import "NLPreferences.h"
 #import "NLWithdrawalEffect.h"
 #import "NLDustRenderer.h"
+#import "NLRuntimeABI.h"
 
 #import <objc/runtime.h>
 #import <substrate.h>
@@ -264,9 +265,9 @@ static void NLCellSetContent(id self, SEL _cmd, id controller)
 /// 在滑动开始时先抓一张图，滑动结束如果 cell 被移除就用这张图。
 static void NLCellPan(id self, SEL _cmd, id gesture)
 {
-    UIGestureRecognizerState state = UIGestureRecognizerStateBegan;
-    if ([gesture respondsToSelector:@selector(state)]) {
-        state = (UIGestureRecognizerState)[gesture performSelector:@selector(state)];
+    UIGestureRecognizerState state = UIGestureRecognizerStatePossible;
+    if (gesture && NLABIMethod(object_getClass(gesture), @selector(state), @encode(NSInteger), 0, NULL)) {
+        state = ((NSInteger (*)(id, SEL))[gesture methodForSelector:@selector(state)])(gesture, @selector(state));
     }
 
     if (state == UIGestureRecognizerStateBegan) {

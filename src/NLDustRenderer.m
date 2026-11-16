@@ -20,7 +20,7 @@ static BOOL NLDustPreparing;                   // 0x26529
 static BOOL NLDustPrepared;                    // 0x2652a
 
 // 0x195e8 起是内嵌的 Metal 源码字符串
-static const char *NLDustMetalSource;
+extern const char *NLDustMetalSource; // deterministic source generated from DustShader.metal
 
 static BOOL NLDustWarmupStarted;   // 0x26529 —— 与 NLDustPreparing 同字节？
 

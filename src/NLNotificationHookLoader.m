@@ -9,6 +9,7 @@
 #import "NLPreferences.h"
 #import "NLDustRenderer.h"
 #import "NLWithdrawalEffect.h"
+#import "NLRuntimeABI.h"
 
 #import <objc/runtime.h>
 #import <substrate.h>
@@ -125,16 +126,21 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
         NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
-    // REVERIFY: 二进制在 0x5cbc 用 `cmp w23,#0x40`（'@'）判定 accessor 返回值，
-    // 随后又检查 `QL` / `Bc` 两处编码。这里的细节按主干意图还原，
-    // 逐字符分支没有完全照抄。
+    // Reconstructed calls require object return and an NSUInteger index.
+    const char *indexArgument[] = { @encode(NSUInteger) };
+    if (!NLABIMethod(listViewClass, @selector(_visibleViewAtIndex:), "@", 1, indexArgument)) {
+        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        return NO;
+    }
 
     Class masterClass = NSClassFromString(@"NCNotificationMasterList");
     SEL clearAllSel = NSSelectorFromString(@"clearAll");
     Method clearAllMethod = class_getInstanceMethod(masterClass, clearAllSel);
     Method masterListMethod = class_getInstanceMethod(masterClass, @selector(masterListView));
 
-    if (clearAllMethod && masterListMethod) {
+    if (!NLOriginalClearAll && clearAllMethod && masterListMethod &&
+        NLABIMethod(masterClass, clearAllSel, "v", 0, NULL) &&
+        NLABIMethod(masterClass, @selector(masterListView), "@", 0, NULL)) {
         // clearAll 的返回类型必须是 void（0x5c54 判 'v'）
         BOOL ok = YES;
         char *rt = method_copyReturnType(clearAllMethod);
@@ -153,8 +159,10 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
     SEL basicSel = NSSelectorFromString(@"removeViewAtIndex:animated:");
     SEL displacedSel = NSSelectorFromString(@"removeViewAtIndex:animated:isHorizontallyDisplaced:");
 
+    const char *basicArguments[] = { @encode(NSUInteger), "B" };
+    const char *displacedArguments[] = { @encode(NSUInteger), "B", "B" };
     Method basicMethod = class_getInstanceMethod(listViewClass, basicSel);
-    if (basicMethod && method_getNumberOfArguments(basicMethod) == 4) {
+    if (!NLOriginalRemove && basicMethod && NLABIMethod(listViewClass, basicSel, "v", 2, basicArguments)) {
         char *rt = method_copyReturnType(basicMethod);
         if (rt && rt[0] == 'v') {
             MSHookMessageEx(listViewClass, basicSel, (IMP)NLRemoveView, &NLOriginalRemove);
@@ -165,7 +173,8 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
 
     // removeViewAtIndex:animated:isHorizontallyDisplaced: —— 5 个参数、返回 void
     Method displacedMethod = class_getInstanceMethod(listViewClass, displacedSel);
-    if (displacedMethod && method_getNumberOfArguments(displacedMethod) == 5) {
+    if (!NLOriginalRemoveDisplaced && displacedMethod &&
+        NLABIMethod(listViewClass, displacedSel, "v", 3, displacedArguments)) {
         char *rt = method_copyReturnType(displacedMethod);
         if (rt && rt[0] == 'v') {
             MSHookMessageEx(listViewClass, displacedSel,

@@ -70,19 +70,8 @@ NSUInteger  NLObservedRemovals   = 0;          // 0x26508
 // incoming notification is "the same card that is already dissolving".
 // NOTE: it does not consult -cleanedUp; it relies on cleanUp detaching the
 // associated object.
-BOOL NLExistingNotificationSnapshotActive(id view)
-{
-    if (![view isKindOfClass:[UIView class]])            // 0x57dc
-        return NO;
-
-    UIView *current = view;                              // 0x5804
-    while (current != nil) {
-        if (objc_getAssociatedObject(current, &NLDustSnapshotKey) != nil)  // 0x5828
-            return YES;
-        current = current.superview;                     // 0x5848
-    }
-    return NO;
-}
+// 0x57b8 is shared with withdrawal effects and defined exactly once in
+// NLPreferences.m. Keeping a second external copy here breaks native linking.
 
 #pragma mark - 0x7388
 

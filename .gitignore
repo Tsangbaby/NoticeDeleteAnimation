@@ -2,3 +2,10 @@ work/
 packages/
 .theos/
 *.deb
+pkg/
+.ci-theos/
+.ci-frameworks/
+build-evidence/
+__pycache__/
+*.pyc
+*.dSYM/

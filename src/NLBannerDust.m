@@ -585,7 +585,7 @@ void NLBannerWriteStatus(void)
 
     NSMutableDictionary *status = [NSMutableDictionary dictionary];
 
-    status[@"build"] = @"test14";
+    status[@"build"] = @"1.0.1+rebuild1";
     status[@"updatedAt"] = @([[NSDate date] timeIntervalSince1970]);
     status[@"pid"] = @(getpid());
     status[@"installed"] = @(NLBannerInstalled);

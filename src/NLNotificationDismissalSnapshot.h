@@ -14,30 +14,10 @@
 #import <objc/runtime.h>
 
 // ---------------------------------------------------------------------------
-// NLDustRenderer
-//
-// Implemented in its own unit (NLDustRenderer.{h,m}). Verified from the ObjC
-// metadata: NLDustRenderer's class_ro superclass is UIView (@0x26180), so it is
-// a UIView subclass and inherits frame/bounds/setFrame:/addSubview:.
-//
-// Only the members the dismissal path touches are declared here. Once the real
-// NLDustRenderer.h exists, define NL_HAVE_DUST_RENDERER_HEADER (and make sure
-// that header is on the include path) instead of using this stub.
+// Real shared renderer declaration. The reconstruction placeholder was only for
+// isolated stub syntax checks; native production units must use one interface.
 // ---------------------------------------------------------------------------
-#ifndef NL_HAVE_DUST_RENDERER_HEADER
-@interface NLDustRenderer : UIView
-+ (BOOL)isReady;                                    // 0x4a98, 0x6bb4
-- (instancetype)initWithImage:(CGImageRef)image      // 0x4c7c
-                    cardFrame:(CGRect)cardFrame
-                particleCount:(NSUInteger)particleCount
-                     duration:(double)duration
-                     distance:(double)distance
-                         seed:(float)seed;
-- (BOOL)primeFrame;                                 // 0x4de4
-- (void)start;                                      // 0x5090
-- (void)invalidate;                                 // 0x4ebc, 0x54cc
-@end
-#endif
+#import "NLDustRenderer.h"
 
 // ---------------------------------------------------------------------------
 // Shared file-scope state

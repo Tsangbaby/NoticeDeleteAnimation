@@ -13,6 +13,7 @@
 #import "NLPreferences.h"
 #import "NLWithdrawalEffect.h"
 #import "NLDustRenderer.h"
+#import "NLRuntimeABI.h"
 
 #import <objc/runtime.h>
 #import <substrate.h>
@@ -74,6 +75,10 @@ static BOOL NLIconSignature(Class cls, SEL sel, unsigned int argc, const char *t
     if (!method || method_getNumberOfArguments(method) != argc) {
         return NO;
     }
+    char *rt = method_copyReturnType(method);
+    BOOL returnsVoid = rt && NLABITypeMatches(rt, "v");
+    free(rt);
+    if (!returnsVoid) return NO;
     size_t want = strlen(types);
     if (argc < 3 || (argc - 2) != want) {
         return NO;
@@ -139,10 +144,10 @@ static BOOL NLIconHomeMembership(id manager, id icon, BOOL *outIsHome)
 // 0x9a54
 static id NLIconGet(id icon, SEL sel)
 {
-    if (!icon || !sel || ![icon respondsToSelector:sel]) {
+    if (!icon || !sel || !NLABIMethod(object_getClass(icon), sel, "@", 0, NULL)) {
         return nil;
     }
-    return [icon performSelector:sel];
+    return ((id (*)(id, SEL))[icon methodForSelector:sel])(icon, sel);
 }
 
 /// 0xc188 —— 找同 manager + 同 icon 上还没结束的快照（去重用）。
@@ -383,14 +388,14 @@ static void NLPrepareIcon(id manager, id icon)
 
     // 2) 类型与状态校验
     SEL typeSel = NSSelectorFromString(@"isApplicationIcon");
-    if (!NLIconGet(icon, typeSel)) {
+    if (!NLABIReadBool(icon, typeSel)) {
         // 文件夹 / widget 不处理
-        if (NLIconGet(icon, NSSelectorFromString(@"isFolderIcon")) ||
-            NLIconGet(icon, NSSelectorFromString(@"isWidgetIcon"))) {
+        if (NLABIReadBool(icon, NSSelectorFromString(@"isFolderIcon")) ||
+            NLABIReadBool(icon, NSSelectorFromString(@"isWidgetIcon"))) {
             return;
         }
     }
-    if (NLIconGet(iconView, NSSelectorFromString(@"isDragging"))) {
+    if (NLABIReadBool(iconView, NSSelectorFromString(@"isDragging"))) {
         return;   // 拖动中不播
     }
 
@@ -534,7 +539,7 @@ BOOL NLInstallIconDustHooks(void)
     SEL remove3    = NSSelectorFromString(@"removeIcon:options:completion:");
     SEL willRemove = NSSelectorFromString(@"iconModel:willRemoveIcon:");
 
-    if (!NLOriginalUninstall1 && NLIconSignature(cls, uninstall1, 3, "@B")) {
+    if (!NLOriginalUninstall1 && NLIconSignature(cls, uninstall1, 3, "@")) {
         MSHookMessageEx(cls, uninstall1, (IMP)NLUninstall1, &NLOriginalUninstall1);
     }
     if (!NLOriginalUninstall2 && NLIconSignature(cls, uninstall2, 4, "@B")) {
