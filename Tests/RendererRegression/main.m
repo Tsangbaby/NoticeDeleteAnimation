@@ -224,6 +224,28 @@ static void RendererTests(void) {
 }
 
 static void CaptureAndLifecycleTests(void) {
+    // Numeric-only diagnostics for this synthetic source, never persist an image.
+    UIGraphicsBeginImageContextWithOptions(card.bounds.size, NO, 2);
+    BOOL maskDrawn = [card drawViewHierarchyInRect:(CGRect){CGPointZero, card.bounds.size} afterScreenUpdates:NO];
+    UIImage *maskFixture = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    CGImageRef maskImage = maskFixture.CGImage;
+    Check(maskDrawn && maskImage != NULL, "synthetic source mask exists before numeric audit");
+    fprintf(stdout,"FIXTURE MASK: drawn=%d size=%zux%zu bpp=%zu info=0x%x alpha=%u\n",maskDrawn,
+        CGImageGetWidth(maskImage),CGImageGetHeight(maskImage),CGImageGetBitsPerPixel(maskImage),
+        (unsigned)CGImageGetBitmapInfo(maskImage),(unsigned)CGImageGetAlphaInfo(maskImage));
+    CFDataRef maskData=CGDataProviderCopyData(CGImageGetDataProvider(maskImage));
+    const UInt8 *maskBytes=CFDataGetBytePtr(maskData);size_t maskStride=CGImageGetBytesPerRow(maskImage);
+    NSUInteger fractional=0,farFractional=0;
+    for(size_t yy=1;yy+1<CGImageGetHeight(maskImage);++yy) for(size_t xx=1;xx+1<CGImageGetWidth(maskImage);++xx) {
+        unsigned aa=maskBytes[yy*maskStride+xx*4+3]; if(aa==0||aa==255)continue;
+        ++fractional;BOOL edge=NO;
+        for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx)
+            if(maskBytes[(size_t)((NSInteger)yy+dy)*maskStride+(size_t)((NSInteger)xx+dx)*4+3]==0)edge=YES;
+        if(!edge){++farFractional;if(farFractional<=3)fprintf(stdout,"FIXTURE MASK partialinterior x=%zu y=%zu alpha=%u\n",xx,yy,aa);}
+    }
+    fprintf(stdout,"FIXTURE MASK: fractional=%lu farther_than_one_zero_pixel=%lu\n",(unsigned long)fractional,(unsigned long)farFractional);
+    fflush(stdout);CFRelease(maskData);
     CGRect original = card.frame; CGFloat alpha = card.alpha;
     NLNotificationDismissalSnapshot *s = Snapshot();
     if (!s) fprintf(stdout, "FIXTURE CAPTURE STAGE: %s\n", [NLListSnapshotStatus() description].UTF8String);

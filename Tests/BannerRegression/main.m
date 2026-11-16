@@ -120,7 +120,12 @@ static void Dismiss(FixtureBN *bn, BOOL animated) {
     [bn _dismissPresentable:expectedPresentable withReason:expectedReason animated:animated userInfo:expectedInfo];
 }
 static void NativeOnly(FixtureBN *bn, BOOL animated) {
+    static NSUInteger ordinal;
+    ++ordinal;
     Dismiss(bn, animated);
+    fprintf(stdout, "BANNER NATIVE-ONLY fixture=%lu calls=%lu prepares=%lu begins=%lu\n",
+        (unsigned long)ordinal, (unsigned long)natives, (unsigned long)prepares, (unsigned long)begins);
+    fflush(stdout);
     CHECK(natives == 1 && prepares == 0 && begins == 0);
     CHECK([animatedHistory isEqual:@[@(animated)]]);
 }
