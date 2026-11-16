@@ -5,9 +5,9 @@ INSTALL_TARGET_PROCESSES = SpringBoard
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = NoticeListTweak
+TWEAK_NAME = NoticeDeleteAnimation
 
-NoticeListTweak_FILES = src/NLDustRenderer.m \
+NoticeDeleteAnimation_FILES = src/NLDustRenderer.m \
                         src/DustShaderSource.m \
                         src/NLNotificationDismissalSnapshot.m \
                         src/NLWithdrawalEffect.m \
@@ -19,10 +19,10 @@ NoticeListTweak_FILES = src/NLDustRenderer.m \
                         src/NLBannerDust.m \
                         src/NLIslandDust.m \
                         src/NLStatusProbe.m
-NoticeListTweak_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
-NoticeListTweak_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics Metal
-NoticeListTweak_LIBRARIES = substrate
-NoticeListTweak_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
+NoticeDeleteAnimation_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+NoticeDeleteAnimation_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics Metal
+NoticeDeleteAnimation_LIBRARIES = substrate
+NoticeDeleteAnimation_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

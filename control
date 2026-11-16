@@ -1,9 +1,11 @@
-Package: com.example.noticelisttweak
-Name: 通知消散
-Version: 1.0.1+rebuild1
-Architecture: iphoneos-arm64e
-Description: RootHide notification-list, app-icon and banner dust effects; experimental device test.
-Maintainer: Local User
-Author: Local User
+Package: com.tsangbaby.noticedeleteanimation
+Name: NoticeDeleteAnimation
+Version: 0.1.0~alpha8
+Architecture: iphoneos-arm
+Description: Particle dissolve effects for notification removal and banners. Experimental device test.
+Maintainer: Tsangbaby
+Author: Tsangbaby
 Section: Tweaks
 Depends: mobilesubstrate, preferenceloader, firmware (>= 15.0)
+Conflicts: com.example.noticelisttweak
+Replaces: com.example.noticelisttweak

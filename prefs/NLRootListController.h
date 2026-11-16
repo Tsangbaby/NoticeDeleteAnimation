@@ -1,6 +1,6 @@
 //
 //  NLRootListController.h
-//  NoticeListTweak Preferences — 通知消散
+//  NoticeDeleteAnimation Preferences — 通知消散
 //
 //  逆向自 1.0.1~test14 的 PreferenceBundle。
 //

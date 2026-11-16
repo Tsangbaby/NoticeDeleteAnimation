@@ -1,6 +1,6 @@
 //
 //  NLDustRenderer.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个方法上方。
 //  着色器源码原样保存在 DustShader.metal（从二进制 __const 完整恢复）。
@@ -57,7 +57,7 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
         @try {
             [NLDustRenderer prepareRenderer];
         } @catch (NSException *e) {
-            NSLog(@"[NoticeListTweak] dust preparation skipped (%@)", e.name);
+            NSLog(@"[NoticeDeleteAnimation] dust preparation skipped (%@)", e.name);
         }
         [self performSelectorOnMainThread:@selector(markReady) withObject:nil waitUntilDone:NO];
     }
@@ -73,6 +73,10 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
 
 
 #pragma mark - NLDustRenderer
+
+@interface NLDustRenderer ()
+@property (nonatomic) BOOL invalidated;
+@end
 
 @implementation NLDustRenderer
 
@@ -127,7 +131,7 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
                                                         options:options
                                                           error:&error];
     if (!library) {
-        NSLog(@"[NoticeListTweak] dust shader unavailable: %@", error.localizedDescription);
+        NSLog(@"[NoticeDeleteAnimation] dust shader unavailable: %@", error.localizedDescription);
         return NO;
     }
 
@@ -148,7 +152,7 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
     NLDustPipeline = [NLDustDevice newRenderPipelineStateWithDescriptor:desc
                                                                  error:&error];
     if (!NLDustPipeline) {
-        NSLog(@"[NoticeListTweak] dust pipeline unavailable: %@", error.localizedDescription);
+        NSLog(@"[NoticeDeleteAnimation] dust pipeline unavailable: %@", error.localizedDescription);
         return NO;
     }
 
@@ -170,6 +174,13 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
     }
 
     if (![[self class] isReady]) {
+        return nil;
+    }
+    // Non-finite geometry/time can otherwise leave an immortal last drawable.
+    if (!isfinite(duration) || !isfinite(distance) || !isfinite(seed) ||
+        !isfinite(cardFrame.origin.x) || !isfinite(cardFrame.origin.y) ||
+        !isfinite(cardFrame.size.width) || !isfinite(cardFrame.size.height) ||
+        cardFrame.size.width <= 0 || cardFrame.size.height <= 0 || particleCount == 0) {
         return nil;
     }
 
@@ -300,7 +311,7 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
 // 0x82fc
 - (void)start
 {
-    if (self.displayLink) {
+    if (self.invalidated || self.displayLink) {
         return;
     }
     self.startTime = CACurrentMediaTime();
@@ -314,9 +325,10 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
 // 0x847c
 - (void)tick:(CADisplayLink *)link
 {
-    if (!self.window || self.window.isHidden) {
+    if (self.invalidated) return;
+    if (!self.window || self.window.isHidden || !isfinite(self.duration) ||
+        !isfinite(self.startTime) || [self hasFailedFrame]) {
         [self invalidate];
-        self.hidden = YES;
         return;
     }
 
@@ -332,22 +344,24 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
 
     if (![self drawProgress:progress]) {
         self.skippedFrames = self.skippedFrames + 1;
-        if (self.skippedFrames >= 7) {
-            [self invalidate];
-            self.hidden = YES;
-        }
+        if (self.skippedFrames >= 7) [self invalidate];
+    } else {
+        self.skippedFrames = 0;
     }
 }
 
 // 0x8650
 - (BOOL)drawProgress:(float)progress
 {
+    if (self.invalidated || !isfinite(progress)) return NO;
+    @try {
     id<MTLTexture> texture = self.texture;
     if (!texture || !NLDustPipeline) {
         return NO;
     }
     CGSize boundsSize = self.bounds.size;
-    if (boundsSize.width < 1.0 || boundsSize.height < 1.0) {
+    if (!isfinite(boundsSize.width) || !isfinite(boundsSize.height) ||
+        boundsSize.width < 1.0 || boundsSize.height < 1.0) {
         return NO;
     }
     // 上一帧还没完成就不提交新帧
@@ -357,8 +371,8 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
         if (status == MTLCommandBufferStatusError) {
             return NO;
         }
-        if (status < MTLCommandBufferStatusScheduled) {   // 4 = scheduled
-            return YES;    // 上一帧在飞，跳过这一帧但仍算成功
+        if (status != MTLCommandBufferStatusCompleted) {
+            return YES;    // Scheduled(3) is still in flight, not Completed(4).
         }
     }
 
@@ -435,20 +449,39 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
     [commandBuffer commit];
 
     return YES;
+    } @catch (NSException *exception) {
+        NSLog(@"[NoticeDeleteAnimation] dust frame skipped (%@)", exception.name);
+        return NO;
+    }
 }
 
 // 0x8e98
 - (void)invalidate
 {
+    if (self.invalidated) return;
+    self.invalidated = YES;
+    // Releasing a command/texture does NOT clear CAMetalLayer's last drawable.
+    // Detach its host before releasing resources, including on failure paths.
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    self.hidden = YES;
+    [self.layer removeAllAnimations];
+    self.layer.contents = nil;
+    [self removeFromSuperview];
+    [CATransaction commit];
     [self.displayLink invalidate];
     self.displayLink = nil;
     self.texture = nil;
     self.lastCommand = nil;
+    void (^completion)(void) = self.completion;
+    self.completion = nil;
+    if (completion) completion();
 }
 
 // 0x8f38
 - (void)dealloc
 {
+    _completion = nil;
     [self invalidate];
 }
 

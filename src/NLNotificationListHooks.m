@@ -1,6 +1,6 @@
 //
 //  NLNotificationListHooks.m
-//  NoticeListTweak 1.0.1~test14
+//  NoticeDeleteAnimation 1.0.1~test14
 //
 //  Reverse-reconstructed list-side hooks:
 //    0x67b4  static void NLRemoveView(id, SEL, NSUInteger, BOOL)
@@ -26,7 +26,7 @@
 // lives in the loader unit. Declared here so this file stays self-contained.
 extern void MSHookMessageEx(Class cls, SEL sel, IMP replacement, IMP *original);
 
-#define NL_LOG(fmt, ...) NSLog((@"[NoticeListTweak] " fmt), ##__VA_ARGS__)
+#define NL_LOG(fmt, ...) NSLog((@"[NoticeDeleteAnimation] " fmt), ##__VA_ARGS__)
 
 // ---------------------------------------------------------------------------
 // File-scope state (all were __ZL... / local symbols of the single original TU)
@@ -35,7 +35,7 @@ extern void MSHookMessageEx(Class cls, SEL sel, IMP replacement, IMP *original);
 // Animation defaults. NLLoadPreferences() @0x6290 re-writes all four on every
 // call (defaults: enabled=YES, duration=1.3, distance=110.0, particles=14000),
 // then applies the CFPreferences overrides from
-// com.example.noticelisttweak: {Enabled, DustDuration, DustDistance, DustParticles}.
+// com.tsangbaby.noticedeleteanimation: {Enabled, DustDuration, DustDistance, DustParticles}.
 // 注：NLAnimationEnabled / NLAnimationDuration / NLDustDistance /
 // NLDustParticleLimit / NLReservedParticles / NLBatchParticleLimit 定义在
 // NLPreferences.m（声明见 NLPreferences.h），此处不再重复定义。

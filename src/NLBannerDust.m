@@ -1,6 +1,6 @@
 //
 //  NLBannerDust.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  BannerKit（通知横幅）消散。逆向自 1.0.1~test14，地址见各函数。
 //
@@ -15,6 +15,7 @@
 #import "NLDustRenderer.h"
 #import "NLRuntimeABI.h"
 #import "NLNotificationListHooks.h"
+#import "NLNotificationDismissalSnapshot.h"
 #import "NLStatusProbe.h"
 #import "NLLockScreenDust.h"
 #import "NLIslandDust.h"
@@ -24,7 +25,7 @@
 #import <substrate.h>
 
 static NSString *const kNLStatusPlistPath =
-    @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
+    @"/var/mobile/Library/Preferences/com.tsangbaby.noticedeleteanimation.banner-status.plist";
 
 // ---------------------------------------------------------------- 全局状态
 static BOOL NLBannerInstalled;                   // 0x265c8
@@ -36,7 +37,8 @@ static NSMutableDictionary<NSString *, NSNumber *> *NLBannerCounters;  // 0x2656
 static NSString *NLBannerLastEvent;              // 0x26570
 static NSString *NLBannerLastView;               // 0x26578
 static NSString *NLBannerLastReason;             // 0x26580
-static NSString *NLBannerLastResolver;           // 0x26588
+static NSString *NLBannerLastResolver;           // fixed diagnostic reason only
+static BOOL NLBannerDismissInProgress;           // covers prepare before effect registration
 static NSDictionary *NLBannerLastHierarchy;      // 0x26590
 
 // 签名白名单：返回类型必须是 void，参数类型必须精确匹配
@@ -89,7 +91,8 @@ static BOOL NLBannerSignature(Class cls, SEL sel, const char *returnType,
     }
     for (unsigned int i = 0; i < want; i++) {
         char *t = method_copyArgumentType(method, i + 2);
-        ok = t && t[0] == argTypes[i];
+        char expected[2] = { argTypes[i], '\0' };
+        ok = t && NLABITypeMatches(t, expected);
         if (t) {
             free(t);
         }
@@ -100,117 +103,80 @@ static BOOL NLBannerSignature(Class cls, SEL sel, const char *returnType,
     return YES;
 }
 
-/// 0xe164 —— 从一个 NCNotificationRequest 生成稳定 key：`%lu:%@%@`
-///
-/// 二进制的字段来源（0x21008/0x21028/0x21048/0x21068）：
-///   - 先校验对象是 NCNotificationRequest
-///   - notificationIdentifier（string，走 methodForSelector 校验）
-///   - sectionIdentifier（string）
-///   - 第一个 %lu 用的是两个字符串 length 的组合（二进制里是 length 比较后
-///     取某个长度值），不是 index 属性。
-/// REVERIFY: `%lu` 的确切来源没完全定死，这里是"两个标识符长度的组合"，
-/// 只要同一 request 每次得到同一个 key 就满足去重用途。
-static NSString *NLBannerRequestKey(id request)
+// Request identity is the object itself, never an identifier string or a controller.
+// Only inspect the presentable's own object-returning links; never UIApplication roots.
+static id NLBannerTypedRequest(id object)
 {
-    if (!request) {
-        return nil;
-    }
-    Class requestClass = NSClassFromString(@"NCNotificationRequest");
-    if (requestClass && ![request isKindOfClass:requestClass]) {
-        return nil;
-    }
-
-    NSString *identifier = nil;
-    NSString *section = nil;
-
-    SEL idSel = NSSelectorFromString(@"notificationIdentifier");
-    if ([request respondsToSelector:idSel]) {
-        id value = NLABIReadObject(request, idSel);
-        if ([value isKindOfClass:[NSString class]]) {
-            identifier = value;
-        }
-    }
-    SEL sectionSel = NSSelectorFromString(@"sectionIdentifier");
-    if ([request respondsToSelector:sectionSel]) {
-        id value = NLABIReadObject(request, sectionSel);
-        if ([value isKindOfClass:[NSString class]]) {
-            section = value;
-        }
-    }
-    if (!identifier && !section) {
-        return nil;
-    }
-
-    NSUInteger bucket = identifier.length + section.length;
-    return [NSString stringWithFormat:@"%lu:%@%@", (unsigned long)bucket,
-            section ?: @"", identifier ?: @""];
+    Class cls = NSClassFromString(@"NCNotificationRequest");
+    return cls && [object isKindOfClass:cls] ? object : nil;
 }
 
-/// 0xe804 —— 从一个 presentable 拿到它的 viewController。
+static NSArray<NSString *> *NLBannerControllerGetters(void)
+{
+    return @[@"viewController", @"notificationViewController", @"_notificationViewController",
+             @"contentViewController", @"_contentViewController"];
+}
+
 static UIViewController *NLBannerVC(id presentable)
 {
-    if (!presentable) {
-        return nil;
-    }
-    for (NSString *key in @[@"viewController",
-                            @"notificationViewController",
-                            @"_notificationViewController",
-                            @"contentViewController",
-                            @"_contentViewController"]) {
-        if ([presentable respondsToSelector:NSSelectorFromString(key)]) {
-            id vc = NLABIReadObject(presentable, NSSelectorFromString(key));
-            if ([vc isKindOfClass:[UIViewController class]]) {
-                return vc;
-            }
-        }
+    if ([presentable isKindOfClass:[UIViewController class]]) return presentable;
+    for (NSString *key in NLBannerControllerGetters()) {
+        id vc = NLABIReadObject(presentable, NSSelectorFromString(key));
+        if ([vc isKindOfClass:[UIViewController class]]) return vc;
     }
     return nil;
 }
 
-/// 0xe430 —— 在 controller 的子控制器树里找承载该 request 的 controller。
-/// 深度优先，最多 4 层。
-static UIViewController *NLBannerFindRequest(id request, UIViewController *controller,
-                                             NSUInteger depth)
+// Bounded, cycle-safe resolution. A wrapper's notificationRequest is authoritative.
+// A controller-only presentable must resolve to a UNIQUE request, not the first child.
+static id NLBannerResolveRequest(id object, NSUInteger depth, NSHashTable *seen,
+                                  NSUInteger *budget, BOOL *ambiguous)
 {
-    if (!request || !controller || depth > 4) {
-        return nil;
+    if (!object || [seen containsObject:object]) return nil;
+    if (depth > 4 || *budget == 0) { *ambiguous = YES; return nil; }
+    --*budget;
+    [seen addObject:object];
+    id direct = NLBannerTypedRequest(object);
+    if (direct) return direct;
+    id own = NLABIReadObject(object, NSSelectorFromString(@"notificationRequest"));
+    if (own) return NLBannerResolveRequest(own, depth + 1, seen, budget, ambiguous);
+
+    NSMutableArray *links = [NSMutableArray array];
+    if ([object isKindOfClass:[UIViewController class]]) {
+        [links addObjectsFromArray:((UIViewController *)object).childViewControllers];
     }
-    if ([controller respondsToSelector:NSSelectorFromString(@"notificationRequest")]) {
-        id own = NLABIReadObject(controller, NSSelectorFromString(@"notificationRequest"));
-        if (own == request) {
-            return controller;
-        }
+    for (NSString *key in NLBannerControllerGetters()) {
+        id vc = NLABIReadObject(object, NSSelectorFromString(key));
+        if ([vc isKindOfClass:[UIViewController class]]) [links addObject:vc];
     }
-    for (UIViewController *child in controller.childViewControllers) {
-        UIViewController *found = NLBannerFindRequest(request, child, depth + 1);
-        if (found) {
-            return found;
-        }
+    id result = nil;
+    for (id link in links) {
+        id candidate = NLBannerResolveRequest(link, depth + 1, seen, budget, ambiguous);
+        if (candidate && result && candidate != result) *ambiguous = YES;
+        if (candidate) result = candidate;
     }
-    return nil;
+    return *ambiguous ? nil : result;
 }
 
-/// 0xf3b0 —— 在 view 的子视图树里找"像卡片"的视图：宽高比接近横幅、
-/// 有 window、不隐藏、alpha 足够。返回找到的视图，并通过 count 输出候选数。
-static UIView *NLBannerCardInView(UIView *view, NSUInteger depth, NSUInteger *count)
+static BOOL NLBannerCardGeometry(UIView *view, CGRect *outRect);
+
+// This is NOT a size-based "first visible view" search. Accept only a real short
+// look class inside the exact request owner's loaded view, excluding child VCs.
+static UIView *NLBannerCardInView(UIView *view, id request, NSHashTable *childRoots,
+                                  NSUInteger depth, NSUInteger *budget)
 {
-    if (![view isKindOfClass:[UIView class]] || depth > 6) {
-        return nil;
-    }
-    if (count) {
-        *count = *count + 1;
-    }
-    if (view.window && !view.isHidden && view.alpha >= 0.02) {
-        CGRect screenRect = [view convertRect:view.bounds toView:nil];
-        if (screenRect.size.width >= 100.0 && screenRect.size.height >= 20.0) {
-            return view;
-        }
+    if (![view isKindOfClass:[UIView class]] || depth > 6 || *budget == 0 ||
+        [childRoots containsObject:view]) return nil;
+    --*budget;
+    if (view.isHidden || view.alpha < 0.02) return nil;
+    Class cardClass = NSClassFromString(@"NCNotificationShortLookView");
+    if (cardClass && [view isKindOfClass:cardClass]) {
+        id own = NLABIReadObject(view, NSSelectorFromString(@"notificationRequest"));
+        return (!own || own == request) && NLBannerCardGeometry(view, NULL) ? view : nil;
     }
     for (UIView *sub in view.subviews) {
-        UIView *found = NLBannerCardInView(sub, depth + 1, count);
-        if (found) {
-            return found;
-        }
+        UIView *card = NLBannerCardInView(sub, request, childRoots, depth + 1, budget);
+        if (card) return card;
     }
     return nil;
 }
@@ -237,20 +203,13 @@ static BOOL NLBannerCardGeometry(UIView *view, CGRect *outRect)
         !isfinite(screenRect.size.width) || !isfinite(screenRect.size.height)) {
         return NO;
     }
-    if (screenRect.size.width < 16.0 || screenRect.size.height < 12.0) {
-        return NO;
-    }
-    // 必须落在屏幕内足够大的比例（0.48 / 0.45 是二进制里的阈值）
-    if (clipped.size.width < screenBounds.size.width * 0.48 ||
-        clipped.size.height < screenBounds.size.height * 0.45) {
-        // REVERIFY: 0.48/0.45 的语义按"屏幕占比下限"还原，
-        // 也可能是相对卡片自身 bounds 的比例。
-        if (clipped.size.width < screenRect.size.width * 0.48 ||
-            clipped.size.height < screenRect.size.height * 0.45) {
-            return NO;
-        }
-    }
-    if (CGRectIsNull(clipped) || CGRectIsEmpty(clipped)) {
+    // A banner must not be a fullscreen container; require enough of the card,
+    // not a percentage of the whole display, to be on screen.
+    if (screenRect.size.width < 100.0 || screenRect.size.height < 20.0 ||
+        screenRect.size.height > screenBounds.size.height * 0.6 ||
+        CGRectIsNull(clipped) || CGRectIsEmpty(clipped) ||
+        clipped.size.width < screenRect.size.width * 0.48 ||
+        clipped.size.height < screenRect.size.height * 0.45) {
         return NO;
     }
     if (outRect) {
@@ -327,63 +286,30 @@ static void NLBannerDescribeController(UIViewController *controller, NSString *p
     }
 }
 
-/// 0xe98c —— 在一个 controller 里找承载该 request 的卡片视图。
-static UIView *NLBannerCardInController(UIViewController *controller,
-                                        NSString *requestKey,
-                                        NSUInteger depth,
-                                        NSHashTable *seen)
+/// Find only controllers that own this exact request. Loading views or falling
+/// back to an unrelated presentable's root would animate the wrong notification.
+static UIView *NLBannerCardInController(UIViewController *controller, id request,
+                                        NSUInteger depth, NSHashTable *seen,
+                                        NSUInteger *budget)
 {
-    if (!controller || depth > 6 || !requestKey) {
-        return nil;
-    }
-    if (seen && [seen containsObject:controller]) {
-        return nil;
-    }
-    if (seen) {
-        [seen addObject:controller];
-    }
-
-    // 1) controller 自己就是承载者
-    NSString *ownKey = nil;
-    if ([controller respondsToSelector:NSSelectorFromString(@"notificationRequest")]) {
-        id request = NLABIReadObject(controller, NSSelectorFromString(@"notificationRequest"));
-        ownKey = NLBannerRequestKey(request);
-    }
-    if ([ownKey isEqual:requestKey] && controller.isViewLoaded) {
-        NSUInteger count = 0;
-        UIView *card = NLBannerCardInView(controller.view, 0, &count);
-        if (card) {
-            return card;
+    if (![controller isKindOfClass:[UIViewController class]] || !request || depth > 6 ||
+        *budget == 0 || [seen containsObject:controller]) return nil;
+    --*budget;
+    [seen addObject:controller];
+    id own = NLABIReadObject(controller, NSSelectorFromString(@"notificationRequest"));
+    if (own == request && NLBannerTypedRequest(own) && controller.isViewLoaded) {
+        UIView *root = controller.viewIfLoaded;
+        NSHashTable *childRoots = [NSHashTable hashTableWithOptions:NSPointerFunctionsObjectPointerPersonality];
+        for (UIViewController *child in controller.childViewControllers) {
+            if (child.isViewLoaded) [childRoots addObject:child.viewIfLoaded];
         }
+        NSUInteger viewBudget = 48;
+        UIView *card = NLBannerCardInView(root, request, childRoots, 0, &viewBudget);
+        if (card) return card;
     }
-
-    // 2) 遍历 shortLookView / lookView 这类直接挂载点
-    for (NSString *key in @[@"_notificationShortLookViewIfLoaded",
-                            @"_lookViewIfLoaded",
-                            @"shortLookView",
-                            @"lookView",
-                            @"notificationView",
-                            @"runtimeView"]) {
-        if (![controller respondsToSelector:NSSelectorFromString(key)]) {
-            continue;
-        }
-        id candidate = NLABIReadObject(controller, NSSelectorFromString(key));
-        if (![candidate isKindOfClass:[UIView class]]) {
-            continue;
-        }
-        NSUInteger count = 0;
-        UIView *card = NLBannerCardInView(candidate, 0, &count);
-        if (card) {
-            return card;
-        }
-    }
-
-    // 3) 递归子控制器
     for (UIViewController *child in controller.childViewControllers) {
-        UIView *found = NLBannerCardInController(child, requestKey, depth + 1, seen);
-        if (found) {
-            return found;
-        }
+        UIView *card = NLBannerCardInController(child, request, depth + 1, seen, budget);
+        if (card) return card;
     }
     return nil;
 }
@@ -423,92 +349,116 @@ static NLDisposition NLBannerDisposition(NLWithdrawalEffect *effect)
 
 #pragma mark - hooks
 
-/// 0xd16c —— 替换 -[BNContentViewController _dismissPresentable:withReason:animated:userInfo:]
+static void NLBannerResolverEvent(NSString *event)
+{
+    NLBannerLastResolver = event; // caller supplies fixed strings, never request data
+    @try { NLBannerRecord(event); }
+    @catch (__unused NSException *exception) { /* do not block native dismissal */ }
+}
+
+static void NLBannerCancel(NLWithdrawalEffect *effect, UIView *card)
+{
+    @try {
+        if (effect) [effect cancel];
+        else if (card) [NLWithdrawalEffect cancelEffectsForView:card];
+    } @catch (__unused NSException *exception) { /* cleanup must not replace native */ }
+}
+
+/// Existing BN dismissal entry, for EVERY reason; no guessed tap/UIControl hook.
 static void NLBannerDismiss(id self, SEL _cmd, id presentable, id reason,
                             BOOL animated, id userInfo)
 {
-    if (![NSThread isMainThread] || NLIslandDustNativeCloseInProgress()) {
-        ((void (*)(id, SEL, id, id, BOOL, id))NLDismissOriginal)(self, _cmd, presentable, reason,
-                                                                  animated, userInfo);
+    if (![NSThread isMainThread] || NLIslandDustNativeCloseInProgress() ||
+        NLBannerDismissInProgress) {
+        ((void (*)(id, SEL, id, id, BOOL, id))NLDismissOriginal)(
+            self, _cmd, presentable, reason, animated, userInfo);
         return;
     }
 
-    NLBannerRecord(@"native-dismiss-seen");
-
-    // 记录 reason（诊断）
-    if ([reason isKindOfClass:[NSString class]]) {
-        NLBannerLastReason = [(NSString *)reason length] > 160
-            ? [(NSString *)reason substringToIndex:160] : (NSString *)reason;
-    } else {
-        NLBannerLastReason = reason ? NSStringFromClass([reason class]) : nil;
-    }
-
-    UIViewController *hostVC = NLBannerVC(presentable);
-    id request = nil;
-    NSString *requestKey = nil;
-    if (hostVC) {
-        request = NLBannerFindRequest(presentable, hostVC, 0);
-        requestKey = NLBannerRequestKey(request);
-    }
-
+    NLBannerDismissInProgress = YES; // prepare may reenter before registration
+    NLWithdrawalEffect *effect = nil;
     UIView *card = nil;
-    if (hostVC && requestKey) {
-        NSHashTable *seen = [NSHashTable hashTableWithOptions:NSPointerFunctionsObjectPointerPersonality];
-        card = NLBannerCardInController(hostVC, requestKey, 0, seen);
-        if (!card) {
-            // 退一步：直接看 presentable 自己的视图层级
-            for (NSString *key in @[@"notificationViewController",
-                                    @"_notificationViewController",
-                                    @"contentViewController"]) {
-                if ([presentable respondsToSelector:NSSelectorFromString(key)]) {
-                    id vc = NLABIReadObject(presentable, NSSelectorFromString(key));
-                    if ([vc isKindOfClass:[UIViewController class]] && [(UIViewController *)vc isViewLoaded]) {
-                        NSUInteger count = 0;
-                        card = NLBannerCardInView([(UIViewController *)vc view], 0, &count);
-                        if (card) {
-                            break;
-                        }
+    @try {
+        @try {
+            NLBannerRecord(@"native-dismiss-seen");
+            // Preserve the existing reason-only diagnostic; never read request IDs/body.
+            NLBannerLastReason = [reason isKindOfClass:[NSString class]]
+                ? ([(NSString *)reason length] > 160 ? [(NSString *)reason substringToIndex:160] : reason)
+                : (reason ? NSStringFromClass([reason class]) : nil);
+            NSHashTable *seen = [NSHashTable hashTableWithOptions:NSPointerFunctionsObjectPointerPersonality];
+            NSUInteger budget = 32;
+            BOOL ambiguous = NO;
+            id request = NLBannerResolveRequest(presentable, 0, seen, &budget, &ambiguous);
+            UIViewController *hostVC = NLBannerVC(presentable);
+            if (!request || ambiguous) {
+                NLBannerResolverEvent(@"no_request");
+            } else if ([NLWithdrawalEffect isPendingForOwner:self payload:presentable]) {
+                NLBannerResolverEvent(@"skip:duplicate");
+            } else {
+                NLBannerResolverEvent(@"requestresolved");
+                [seen removeAllObjects];
+                budget = 48;
+                card = NLBannerCardInController(hostVC, request, 0, seen, &budget);
+                // A request can itself be the presentable, without viewController.
+                // Only inspect this BN controller's children, still requiring exact identity.
+                if (!card && [self isKindOfClass:[UIViewController class]]) {
+                    card = NLBannerCardInController(self, request, 0, seen, &budget);
+                }
+                if (card) {
+                    effect = [NLWithdrawalEffect prepareView:card source:request preference:@"BannerKit"];
+                    if (effect) {
+                        effect.owner = self;
+                        effect.payload = presentable;
+                        effect.disposition = NLBannerDisposition;
+                        effect.requiresRemovalConfirmation = YES;
+                        NLBannerLastView = NSStringFromClass([card class]);
+                        NLBannerResolverEvent(@"prepared");
+                    } else {
+                        NLBannerResolverEvent(@"capturefail");
                     }
+                } else {
+                    NLBannerResolverEvent(@"nohost");
                 }
             }
+            if (!card) {
+                NLBannerRecord(@"skip:no-real-card");
+                NSMutableArray *controllers = [NSMutableArray array];
+                NSMutableArray *views = [NSMutableArray array];
+                [seen removeAllObjects];
+                budget = 48;
+                NLBannerDescribeController(hostVC, @"current-presentable-compact-root", 0,
+                                           controllers, views, seen, &budget);
+                NLBannerLastHierarchy = @{
+                    @"presentableClass": presentable ? NSStringFromClass([presentable class]) : @"nil",
+                    @"controllers": controllers, @"views": views,
+                };
+            }
+        } @catch (__unused NSException *exception) {
+            NLBannerCancel(effect, card);
+            effect = nil;
+            NLBannerResolverEvent(@"capturefail");
         }
-    }
 
-    NLWithdrawalEffect *effect = nil;
-    if (card) {
-        effect = [NLWithdrawalEffect prepareView:card
-                                          source:request
-                                      preference:@"BannerKit"];
-        if (effect) {
-            effect.owner = self;
-            effect.payload = presentable;
-            effect.disposition = NLBannerDisposition;
-            effect.identity = requestKey;
-            NLBannerLastView = NSStringFromClass([card class]);
+        // Exactly one native invocation, outside the capture exception handler.
+        // Forward original objects untouched; suppress animation only after real prepare.
+        @try {
+            ((void (*)(id, SEL, id, id, BOOL, id))NLDismissOriginal)(
+                self, _cmd, presentable, reason, effect ? NO : animated, userInfo);
+        } @catch (__unused NSException *exception) {
+            NLBannerCancel(effect, card);
+            @throw; // preserve native exception, never retry original
         }
-    } else {
-        NLBannerRecord(@"skip:no-real-card");
-        // 存一份层级快照供诊断
-        NSMutableArray *controllers = [NSMutableArray array];
-        NSMutableArray *views = [NSMutableArray array];
-        NSHashTable *seen = [NSHashTable hashTableWithOptions:NSPointerFunctionsObjectPointerPersonality];
-        NSUInteger budget = 48;
-        NLBannerDescribeController(hostVC, @"current-presentable-compact-root", 0,
-                                   controllers, views, seen, &budget);
-        NLBannerLastHierarchy = @{
-            @"presentableClass": presentable ? NSStringFromClass([presentable class]) : @"nil",
-            @"controllers": controllers,
-            @"views": views,
-        };
-        NLBannerRecord(@"card-structure-captured");
+        @try {
+            [effect beginAfterNativeRemoval];
+        } @catch (__unused NSException *exception) {
+            NLBannerCancel(effect, card);
+            NLBannerResolverEvent(@"finalizefail");
+        }
+    } @finally {
+        NLBannerDismissInProgress = NO;
+        @try { NLBannerWriteStatus(); }
+        @catch (__unused NSException *exception) { /* diagnostics are best effort */ }
     }
-
-    // 原生收回：有自定义效果时强制 animated=NO，让位给颗粒动画
-    ((void (*)(id, SEL, id, id, BOOL, id))NLDismissOriginal)(
-        self, _cmd, presentable, reason, animated && (effect == nil), userInfo);
-
-    [effect beginAfterNativeRemoval];
-    NLBannerWriteStatus();
 }
 
 /// 0xdb14 —— 替换 -[BNContentViewController presentPresentable:withOptions:userInfo:]
@@ -535,15 +485,13 @@ static void NLBannerAdd(id self, SEL _cmd, id presentable, id delegate, BOOL inc
 /// 0xc478
 BOOL NLInstallBannerDustHooks(void)
 {
-    if (NLBannerInstalled) {
-        return YES;
-    }
     if (![NSThread isMainThread]) {
         return NO;
     }
+    if (NLDismissOriginal && NLPresentOriginal && NLAddOriginal) return YES;
 
     Class cls = NSClassFromString(@"BNContentViewController");
-    if (!cls) {
+    if (!cls || ![cls isSubclassOfClass:[UIViewController class]]) {
         return NO;
     }
 
@@ -555,17 +503,18 @@ BOOL NLInstallBannerDustHooks(void)
     BOOL presentOK = NLBannerSignature(cls, presentSel, "v", kNLBannerPresentTypes);
     BOOL addOK = NLBannerSignature(cls, addSel, "v", kNLBannerAddTypes);
 
-    if (dismissOK) {
+    if (dismissOK && !NLDismissOriginal) {
         MSHookMessageEx(cls, dismissSel, (IMP)NLBannerDismiss, &NLDismissOriginal);
+        NLBannerRecord(@"clickpathunknown"); // capability unknown, NOT a tap observation
     }
-    if (presentOK) {
+    if (presentOK && !NLPresentOriginal) {
         MSHookMessageEx(cls, presentSel, (IMP)NLBannerPresent, &NLPresentOriginal);
     }
-    if (addOK) {
+    if (addOK && !NLAddOriginal) {
         MSHookMessageEx(cls, addSel, (IMP)NLBannerAdd, &NLAddOriginal);
     }
 
-    NLBannerInstalled = dismissOK || presentOK || addOK;
+    NLBannerInstalled = NLDismissOriginal != NULL; // present/add alone cannot withdraw
 
     // 启动状态探测（NLNotificationStatusProbe 见 NLStatusProbe.m）
     Class probeClass = NSClassFromString(@"NLNotificationStatusProbe");
@@ -586,7 +535,7 @@ void NLBannerWriteStatus(void)
 
     NSMutableDictionary *status = [NSMutableDictionary dictionary];
 
-    status[@"build"] = @"1.0.1+rebuild1";
+    status[@"build"] = @"0.1.0~alpha8";
     status[@"updatedAt"] = @([[NSDate date] timeIntervalSince1970]);
     status[@"pid"] = @(getpid());
     status[@"installed"] = @(NLBannerInstalled);
@@ -595,9 +544,16 @@ void NLBannerWriteStatus(void)
     status[@"reduceMotion"] = @(UIAccessibilityIsReduceMotionEnabled());
     status[@"mode"] = @"native-withdrawal";
     status[@"loaded"] = @YES;
+    status[@"dismissHook"] = @(NLDismissOriginal != NULL);
+    status[@"clickPath"] = @"unverified";
+    status[@"listSnapshot"] = NLListSnapshotStatus();
 
-    // 事件计数
+    // Fixed reason counters; clickpathunknown counts hook capability declarations,
+    // not clicks. Request identifiers/content are neither read nor serialized.
     NSMutableDictionary *events = [NSMutableDictionary dictionary];
+    for (NSString *key in @[@"requestresolved", @"no_request", @"nohost", @"capturefail", @"clickpathunknown"]) {
+        events[key] = @0;
+    }
     for (NSString *key in NLBannerCounters) {
         events[key] = NLBannerCounters[key];
     }
@@ -613,6 +569,7 @@ void NLBannerWriteStatus(void)
     status[@"cellClearHook"] = lock[@"cellClearHook"];
     status[@"collectionDeleteHook"] = lock[@"collectionDeleteHook"];
 
+    if (NLBannerLastResolver) status[@"lastResolver"] = NLBannerLastResolver;
     if (NLBannerLastEvent) status[@"lastEvent"] = NLBannerLastEvent;
     if (NLBannerLastView)  status[@"lastViewClass"] = NLBannerLastView;
     if (NLBannerLastReason) status[@"lastDismissReason"] = NLBannerLastReason;

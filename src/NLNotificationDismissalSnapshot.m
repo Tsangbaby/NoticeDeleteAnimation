@@ -1,6 +1,6 @@
 //
 //  NLNotificationDismissalSnapshot.m
-//  NoticeListTweak 1.0.1~test14
+//  NoticeDeleteAnimation 1.0.1~test14
 //
 //  Reverse-reconstructed implementation of the dismissal-snapshot object.
 //  Recovered from work/listing.txt @0x46e8..0x57b8 and work/objcdump.txt.
@@ -10,9 +10,145 @@
 //
 
 #import "NLNotificationDismissalSnapshot.h"
+#import "NLRuntimeABI.h"
+
+// Fixed phase counters only: distinguish a safe native fallback from success.
+static NSUInteger NLListAttempts, NLListNoCard, NLListPrepared, NLListStarted;
+NSDictionary *NLListSnapshotStatus(void) {
+    if (![NSThread isMainThread]) return @{};
+    return @{ @"attempts":@(NLListAttempts), @"noCard":@(NLListNoCard),
+              @"prepared":@(NLListPrepared), @"started":@(NLListStarted) };
+}
+
+// A list accessor returns a row, including swipe actions. Only follow a known,
+// ABI-checked, already-loaded controller relationship; never pick a subtree by
+// size, colour or private class-name heuristics. Unknown layouts stay native.
+static UIView *NLNotificationCardInRow(UIView *row, UIViewController **resolvedController)
+{
+    @try {
+        for (NSString *key in @[@"contentViewController", @"notificationViewController",
+                                @"_contentViewController", @"_notificationViewController"]) {
+            id controller = NLABIReadObject(row, NSSelectorFromString(key));
+            if (![controller isKindOfClass:[UIViewController class]]) continue;
+            UIView *card = [(UIViewController *)controller viewIfLoaded];
+            if (card && card != row && card.window == row.window &&
+                [card isDescendantOfView:row] && !card.hidden && card.alpha >= 0.02) {
+                if (resolvedController) *resolvedController = controller;
+                return card;
+            }
+        }
+    } @catch (NSException *exception) {
+        return nil;
+    }
+    return nil;
+}
+
+static BOOL NLNotificationCardStillMatches(UIView *row, UIView *card, UIViewController *controller)
+{
+    UIViewController *current = nil;
+    return NLNotificationCardInRow(row, &current) == card && current == controller;
+}
+
+// Reject shapes we cannot map without sampling concealed siblings. Translation
+// and positive axis scales are safe; rotated/3-D/masked ancestor clips are not.
+static CGRect NLNotificationVisibleRect(UIView *card, UIView *list, UIWindow *window)
+{
+    CGRect visible = CGRectIntersection([card convertRect:card.bounds toView:window],
+        CGRectIntersection([list convertRect:list.bounds toView:window], window.bounds));
+    UIView *node = card;
+    for (NSUInteger depth = 0; node && depth < 64; ++depth, node = node.superview) {
+        CGAffineTransform t = node.transform;
+        if (node.hidden || node.alpha < 0.02 || !isfinite(t.a) || !isfinite(t.d) ||
+            t.a <= 0 || t.d <= 0 || t.b != 0 || t.c != 0 ||
+            !CATransform3DIsAffine(node.layer.transform) ||
+            !CATransform3DIsIdentity(node.layer.sublayerTransform) || node.layer.mask)
+            return CGRectNull;
+        if (node != card && (node.clipsToBounds || node.layer.masksToBounds)) {
+            if (node.layer.cornerRadius != 0) return CGRectNull;
+            visible = CGRectIntersection(visible, [node convertRect:node.bounds toView:window]);
+        }
+        if (node == window) return visible;
+    }
+    return CGRectNull;
+}
+
+// A window composite is already flattened against its backdrop. Multiplying a
+// translucent interior by its source alpha would apply opacity twice. Without
+// mutating the live hierarchy there is no general inverse composite: fail closed
+// for such interiors, while keeping the original antialiased perimeter mask.
+static BOOL NLNotificationOpaqueInterior(CGImageRef image)
+{
+    CGImageAlphaInfo alpha = CGImageGetAlphaInfo(image);
+    CGBitmapInfo order = CGImageGetBitmapInfo(image) & kCGBitmapByteOrderMask;
+    if (CGImageGetBitsPerPixel(image) != 32 ||
+        !((order == kCGBitmapByteOrder32Little && alpha == kCGImageAlphaPremultipliedFirst) ||
+          (order == kCGBitmapByteOrderDefault && alpha == kCGImageAlphaPremultipliedLast))) return NO;
+    CFDataRef data = CGDataProviderCopyData(CGImageGetDataProvider(image));
+    if (!data) return NO;
+    size_t width = CGImageGetWidth(image), height = CGImageGetHeight(image), stride = CGImageGetBytesPerRow(image);
+    const UInt8 *bytes = CFDataGetBytePtr(data);
+    BOOL valid = width >= 3 && height >= 3 && stride >= width * 4 &&
+        CFDataGetLength(data) >= (CFIndex)(stride * height);
+    for (size_t y = 1; valid && y + 1 < height; ++y) {
+        for (size_t x = 1; x + 1 < width; ++x) {
+            UInt8 a = bytes[y * stride + x * 4 + 3];
+            if (a == 0 || a == 255) continue;
+            BOOL edge = NO;
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    if (bytes[(size_t)((NSInteger)y + dy) * stride + (size_t)((NSInteger)x + dx) * 4 + 3] == 0) edge = YES;
+            if (!edge) { valid = NO; break; }
+        }
+    }
+    CFRelease(data);
+    return valid;
+}
+
+// Isolated UIVisualEffect/backdrop captures can contain an opaque grey fallback.
+// Capture colour with the window's compositing context (cropped by the small
+// bitmap), but retain the card-only alpha footprint, including rounded corners.
+// No view properties are changed, no grey pixels are removed, and no wallpaper
+// rectangle outside the original footprint is admitted into the texture.
+static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
+                                       CGRect cardRect, CGRect visible)
+{
+    UIImage *mask = nil;
+    UIGraphicsBeginImageContextWithOptions(visible.size, NO, 2.0);
+    @try {
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        if (!context) return nil;
+        CGContextTranslateCTM(context, cardRect.origin.x - visible.origin.x,
+                              cardRect.origin.y - visible.origin.y);
+        if (![card drawViewHierarchyInRect:(CGRect){CGPointZero, cardRect.size}
+                        afterScreenUpdates:NO]) return nil;
+        mask = UIGraphicsGetImageFromCurrentImageContext();
+    } @catch (NSException *exception) {
+        return nil;
+    } @finally {
+        UIGraphicsEndImageContext();
+    }
+    if (!mask.CGImage || !NLNotificationOpaqueInterior(mask.CGImage)) return nil;
+    UIGraphicsBeginImageContextWithOptions(visible.size, NO, 2.0);
+    @try {
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        if (!context) return nil;
+        CGContextSaveGState(context);
+        CGContextTranslateCTM(context, -visible.origin.x, -visible.origin.y);
+        BOOL drawn = [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:NO];
+        CGContextRestoreGState(context);
+        if (!drawn) return nil;
+        [mask drawInRect:(CGRect){CGPointZero, visible.size}
+              blendMode:kCGBlendModeDestinationIn alpha:1.0];
+        return UIGraphicsGetImageFromCurrentImageContext();
+    } @catch (NSException *exception) {
+        return nil;
+    } @finally {
+        UIGraphicsEndImageContext();
+    }
+}
 
 // The tweak's own log prefix; every NSLog in this file uses it verbatim.
-#define NL_LOG(fmt, ...) NSLog((@"[NoticeListTweak] " fmt), ##__VA_ARGS__)
+#define NL_LOG(fmt, ...) NSLog((@"[NoticeDeleteAnimation] " fmt), ##__VA_ARGS__)
 
 // Associated-object key. A single byte is enough: only its *address* is used.
 // 0x264c0
@@ -23,6 +159,10 @@
 // -method_getNumberOfArguments == 3 and an '@' return type before hooking).
 @interface UIView (NLPrivateRowAccess)
 - (UIView *)_visibleViewAtIndex:(NSUInteger)index;
+@end
+
+@interface NLNotificationDismissalSnapshot ()
+@property (nonatomic) CFTimeInterval frameDeadline;
 @end
 
 @implementation NLNotificationDismissalSnapshot
@@ -50,6 +190,7 @@
     // --- gates that never touch the view hierarchy -------------------------
     if (![NSThread isMainThread])                                          // 0x4740
         return nil;
+    NLListAttempts = MIN(1000000UL, NLListAttempts + 1);
     if (UIAccessibilityIsReduceMotionEnabled() || NLActiveSnapshots > 5)    // 0x4754
         return nil;
     if (![view isKindOfClass:[UIView class]])                              // 0x4770
@@ -64,6 +205,17 @@
     if (objc_getAssociatedObject(view, &NLDustSnapshotKey) != nil)         // 0x47e0
         return nil;
 
+    // Keep the row for de-duplication/removal semantics; capture only its card.
+    UIView *sourceRow = view;
+    UIViewController *capturedController = nil;
+    view = NLNotificationCardInRow(sourceRow, &capturedController);
+    if (!view) {
+        NLListNoCard = MIN(1000000UL, NLListNoCard + 1);
+        return nil;
+    }
+    if (!isfinite(NLAnimationDuration) || !isfinite(NLDustDistance))
+        return nil;
+
     // --- the card must really be on screen, inside the same window --------
     UIWindow *window = view.window;                                        // 0x4850
     if (window == nil)
@@ -75,11 +227,10 @@
     if (![view isDescendantOfView:list])                                   // 0x48c0
         return nil;
 
-    // Intersect [view in window] with [list in window] with [window bounds].
+    // Intersect [view in window] with every clipping ancestor and the window.
+    CGRect capturedWindowBounds = window.bounds;
     CGRect viewRect = [view convertRect:view.bounds toView:window];        // 0x48d4
-    CGRect listRect = [list convertRect:list.bounds toView:window];        // 0x4910
-    CGRect visible  = CGRectIntersection(viewRect,
-                        CGRectIntersection(listRect, window.bounds));      // 0x493c..0x498c
+    CGRect visible = NLNotificationVisibleRect(view, list, window);
     if (CGRectIsNull(visible))                                             // 0x49a0
         return nil;
     if (CGRectIsEmpty(visible))                                            // 0x49b8
@@ -128,21 +279,13 @@
         return nil;
 
     // --- rasterise the card ------------------------------------------------
-    UIGraphicsBeginImageContextWithOptions(visible.size, NO, 2.0);          // 0x4afc
-    CGContextRef ctx = UIGraphicsGetCurrentContext();                       // 0x4b10
-    if (ctx == NULL) {                                                      // 0x4b14
-        UIGraphicsEndImageContext();
-        return nil;
-    }
-    // Shift so that the *visible* sub-rect of the card lands at (0,0).
-    CGContextTranslateCTM(ctx, viewRect.origin.x - visible.origin.x,
-                               viewRect.origin.y - visible.origin.y);        // 0x4b18
-    BOOL drawn = [view drawViewHierarchyInRect:CGRectMake(0, 0,
-                                        viewRect.size.width, viewRect.size.height)
-                            afterScreenUpdates:NO];                          // 0x4b28
-    UIImage *image = drawn ? UIGraphicsGetImageFromCurrentImageContext() : nil; // 0x4b48
-    UIGraphicsEndImageContext();                                             // 0x4b6c
-    if (image == nil || image.CGImage == NULL)                               // 0x4b8c
+    UIImage *image = NLNotificationCardImage(view, window, viewRect, visible);
+    if (image == nil || image.CGImage == NULL ||
+        !NLNotificationCardStillMatches(sourceRow, view, capturedController) || view.window != window ||
+        list.window != window || !CGRectEqualToRect(window.bounds, capturedWindowBounds) ||
+        ![sourceRow isDescendantOfView:list] ||
+        !CGRectEqualToRect(viewRect, [view convertRect:view.bounds toView:window]) ||
+        !CGRectEqualToRect(visible, NLNotificationVisibleRect(view, list, window)))
         return nil;
 
     // --- geometry of the particle field ------------------------------------
@@ -179,18 +322,26 @@
     [snapshot addSubview:renderer];                                            // 0x4dbc
     [window addSubview:snapshot];                                              // 0x4dd0
 
-    // Prime one frame before the effect is allowed to start; if the very first
-    // frame cannot be produced there is no point keeping the snapshot around.
-    if (![renderer primeFrame]) {                                              // 0x4de4
-        [renderer invalidate];                                                 // 0x4ebc
-        [snapshot removeFromSuperview];                                        // 0x4ecc
+    // Completion owns prompt overlay/accounting teardown, not a later watchdog.
+    __weak NLNotificationDismissalSnapshot *weakSnapshot = snapshot;
+    renderer.completion = ^{ [weakSnapshot cleanUp]; };
+    BOOL primed = NO;
+    @try { primed = [renderer primeFrame]; }
+    @catch (NSException *exception) { primed = NO; }
+    if (!primed || !NLNotificationCardStillMatches(sourceRow, view, capturedController) || view.window != window ||
+        list.window != window || ![sourceRow isDescendantOfView:list] ||
+        !CGRectEqualToRect(window.bounds, capturedWindowBounds) ||
+        objc_getAssociatedObject(sourceRow, &NLDustSnapshotKey) != nil ||
+        !CGRectEqualToRect(viewRect, [view convertRect:view.bounds toView:window]) ||
+        !CGRectEqualToRect(visible, NLNotificationVisibleRect(view, list, window))) {
+        [snapshot cleanUp];
         return nil;
     }
 
     // --- publish -----------------------------------------------------------
-    [snapshot setSourceView:view];                                             // 0x4df8 (weak)
+    [snapshot setSourceView:sourceRow];                                         // row, not content card
     [snapshot setSourceList:list];                                             // 0x4e0c (weak)
-    objc_setAssociatedObject(view, &NLDustSnapshotKey, snapshot,
+    objc_setAssociatedObject(sourceRow, &NLDustSnapshotKey, snapshot,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);               // 0x4e1c
     [snapshot setCounted:YES];                                                 // 0x4e38
     NLActiveSnapshots   += 1;                                                  // 0x4e48
@@ -200,6 +351,7 @@
     [snapshot performSelector:@selector(cleanUp)
                    withObject:nil
                    afterDelay:NLAnimationDuration + 0.3];                      // 0x4e64..0x4e94
+    NLListPrepared = MIN(1000000UL, NLListPrepared + 1);
     return snapshot;
 }
 
@@ -218,8 +370,24 @@
     }
     if (self.animationStarted)                                                 // 0x4ffc
         return;
+    // Submission is not first-frame completion. Do not start the dissolve clock
+    // until the primed command has completed; a stuck GPU must fail closed.
+    if ([self.dustRenderer hasFailedFrame]) {
+        [self cleanUp];
+        return;
+    }
+    if (![self.dustRenderer hasCompletedFrame]) {
+        CFTimeInterval now = CACurrentMediaTime();
+        if (self.frameDeadline == 0) self.frameDeadline = now + 0.35;
+        if (now >= self.frameDeadline) { [self cleanUp]; return; }
+        [NSObject cancelPreviousPerformRequestsWithTarget:self
+            selector:@selector(startRemovalAnimation) object:nil];
+        [self performSelector:@selector(startRemovalAnimation) withObject:nil afterDelay:0.016];
+        return;
+    }
 
     self.animationStarted  = YES;                                              // 0x5038
+    NLListStarted = MIN(1000000UL, NLListStarted + 1);
     self.waitingForRemoval = NO;                                               // 0x504c
     self.hidden            = NO;                                               // 0x5060
     [self.dustRenderer start];                                                 // 0x5074
@@ -304,6 +472,8 @@
     if (self.cleanedUp)                                                        // 0x53e8
         return;
     self.cleanedUp = YES;                                                      // 0x5408
+    self.hidden = YES;
+    self.waitingForRemoval = NO;
 
     // Cancel every pending performSelector (the 1.6 s safety net and any
     // in-flight poll tick).
@@ -320,6 +490,7 @@
             NLReservedParticles -= reserved;                                    // 0x5498
     }
 
+    self.dustRenderer.completion = nil;
     [self.dustRenderer invalidate];                                             // 0x54b0
     self.dustRenderer = nil;                                                    // 0x54e0
 
@@ -332,8 +503,7 @@
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);        // 0x5538
     }
     self.sourceView = nil;                                                      // 0x5554
-    // REVERIFY: _sourceList is *not* cleared here in the binary; it is only
-    // released by .cxx_destruct @0x5764. Kept faithful to the binary.
+    self.sourceList = nil;
 
     [self.layer removeAllAnimations];                                           // 0x5568
     [self removeFromSuperview];                                                 // 0x5598

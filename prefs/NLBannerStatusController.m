@@ -1,6 +1,6 @@
 //
 //  NLBannerStatusController.m
-//  NoticeListTweak Preferences — 通知消散
+//  NoticeDeleteAnimation Preferences — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个方法上方。
 //
@@ -8,8 +8,8 @@
 #import "NLRootListController.h"
 
 static NSString *const kNLStatusPlistPath =
-    @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
-static NSString *const kNLBuildVersion __attribute__((unused)) = @"1.0.1+rebuild1";
+    @"/var/mobile/Library/Preferences/com.tsangbaby.noticedeleteanimation.banner-status.plist";
+static NSString *const kNLBuildVersion __attribute__((unused)) = @"0.1.0~alpha8";
 
 // 事件键 → 中文说明（顺序与原实现一致）
 static __attribute__((unused)) NSArray<NSArray<NSString *> *> *NLEventDescriptions(void)
@@ -122,7 +122,7 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
                            events:(NSDictionary *)events
 {
     if (!status) {
-        return @"设置组件版本：1.0.1+rebuild1\n\n"
+        return @"设置组件版本：0.1.0~alpha8\n\n"
                 "尚未读到 SpringBoard 运行状态。\n"
                 "安装后请重新载入桌面，回到这里点刷新。若仍没有状态，请检查插件是否已启用 SpringBoard 注入。";
     }
@@ -136,7 +136,7 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
     NSString *loaded = status[@"loaded"] ? @"已加载，等待通知收回" : @"（请重新载入桌面）";
     NSString *updated = status[@"updatedAt"] ? [status[@"updatedAt"] description] : @"未知";
 
-    [out appendFormat:@"设置组件版本：1.0.1+rebuild1\n桌面运行版本：%@%@\n更新：%@\n\n",
+    [out appendFormat:@"设置组件版本：0.1.0~alpha8\n桌面运行版本：%@%@\n更新：%@\n\n",
                      build, loaded, updated];
 
     [out appendString:@"模式：原生收回时消散\n插件倒计时：已取消\n\n"];
@@ -155,6 +155,15 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
                      NLHookState(status[@"collectionDeleteHook"]),
                      NLBoolState(status[@"metalReady"], @"就绪", @"未就绪"),
                      NLBoolState(status[@"reduceMotion"], @"开（跳过效果）", @"关")];
+
+    NSDictionary *listStatus = [status[@"listSnapshot"] isKindOfClass:NSDictionary.class] ? status[@"listSnapshot"] : @{};
+    [out appendFormat:@"列表尝试／无卡片／准备／启动：%@／%@／%@／%@\n",
+        NLCountText(listStatus, @"attempts"), NLCountText(listStatus, @"noCard"),
+        NLCountText(listStatus, @"prepared"), NLCountText(listStatus, @"started")];
+    [out appendFormat:@"横幅请求解析／无请求／无卡片／捕获失败：%@／%@／%@／%@\n",
+        NLCountText(events, @"requestresolved"), NLCountText(events, @"no_request"),
+        NLCountText(events, @"nohost"), NLCountText(events, @"capturefail")];
+    [out appendString:@"点击路由：尚未真机确认；unknown 是能力声明，不是点击次数。\n\n"];
 
     [out appendFormat:@"系统收回：%@ 次\n"
                       @"TrollOpen 收回：%@ 次\n"

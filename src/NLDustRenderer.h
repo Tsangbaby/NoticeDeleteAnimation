@@ -1,6 +1,6 @@
 //
 //  NLDustRenderer.h
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  由 1.0.1~test14 二进制逆向重建。原始地址见各实现文件注释。
 //
@@ -55,8 +55,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// 已有 displayLink 时直接返回。
 - (void)start;
 
-/// 停止并清空 displayLink / texture / lastCommand。
+/// 终止时先隐藏并移除 CAMetalLayer 宿主，再释放资源；幂等，不可重新启动。
 - (void)invalidate;
+
+/// 完成、失败或主动终止后调用一次（主线程）；先清空回调再调用以允许 owner 清理。
+@property (nonatomic, copy, nullable) void (^completion)(void);
 
 /// 绘制一帧。返回 NO 表示这一帧没有画出来（会被计入 skippedFrames）。
 - (BOOL)drawProgress:(float)progress;

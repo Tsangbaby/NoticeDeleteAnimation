@@ -1,6 +1,6 @@
 //
 //  NLPreferences.h
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 
 #import <Foundation/Foundation.h>
@@ -8,7 +8,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern NSString *const NLAppID;   // @"com.example.noticelisttweak"
+extern NSString *const NLAppID;   // @"com.tsangbaby.noticedeleteanimation"
 
 // 全局配置（二进制里的 __ZL* 变量）
 extern NSUInteger NLDustParticleLimit;   // 0x263b0

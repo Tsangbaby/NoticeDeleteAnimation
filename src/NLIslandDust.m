@@ -1,6 +1,6 @@
 //
 //  NLIslandDust.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  灵动岛（TrollOpen / Nice "Aperture"）通知的消散。逆向自 1.0.1~test14。
 //

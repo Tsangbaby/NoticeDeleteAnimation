@@ -1,6 +1,6 @@
 //
 //  NLNotificationDismissalSnapshot.h
-//  NoticeListTweak 1.0.1~test14  (RootHide layout, arm64/arm64e)
+//  NoticeDeleteAnimation 1.0.1~test14  (RootHide layout, arm64/arm64e)
 //
 //  Reverse-reconstructed from the shipped dylib. The original sources are lost;
 //  everything here was recovered from the annotated disassembly in
@@ -18,6 +18,9 @@
 // isolated stub syntax checks; native production units must use one interface.
 // ---------------------------------------------------------------------------
 #import "NLDustRenderer.h"
+
+/// Fixed phase counts only, no notification data or hierarchy.
+NSDictionary *NLListSnapshotStatus(void);
 
 // ---------------------------------------------------------------------------
 // Shared file-scope state

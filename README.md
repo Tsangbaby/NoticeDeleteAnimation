@@ -1,62 +1,34 @@
-# NoticeListTweak 逆向重建工程
+# NoticeDeleteAnimation
 
-> **本分支为上传源码的独立 RootHide 构建候选 `1.0.1+rebuild1`**，不是 NoticeDeleteAnimation alpha7。原始说明保留在下方；本次修正、原生编译验收及未验证行为分别见 [构建计划](Docs/BUILD-REBUILD1.md)、[变更与边界](Docs/REBUILD1-CHANGES.md)。CI 成功不等于目标设备动画已验证。
+作者 / 维护者：**Tsangbaby**
 
-从 `通知消散 1.0.1~test14` 的已编译 deb 完整重建的可维护源码工程。
+Package：`com.tsangbaby.noticedeleteanimation`
+当前候选：`0.1.0~alpha8`，iOS15+、RootHide arm64/arm64e。
 
-## 目录
-
-```
-notice-rebuild/
-├── src/                    主插件源码（SpringBoard 注入的 dylib）
-├── prefs/                  PreferenceBundle 子工程
-├── layout/                 打包时原样复制的资源（plist / 图标）
-├── control                 包元数据
-├── Makefile                主 Makefile（theos）
-├── work/                   逆向工作区（反汇编、注释、解析器、证据）
-├── INDEX.md                调查索引与样本身份
-└── REVERSE-NOTES.md        逆向过程与已知不确定点
-```
+本分支把已在用户设备生效的重建实现维护为 NoticeDeleteAnimation。alpha8 的目标是改善删除通知时的灰块、修正系统横幅请求解析，并统一所有安装与运行身份。内部 `NL*` 符号属于实现细节，不是另一个已安装插件。
 
 ## 构建
 
-需要 theos + iOS SDK（16.5 或更新）以及 RootHide 打包 scheme。
+在云端 Mac / Xcode 和固定官方 RootHide Theos 下运行，不把 Linux 桩头语法检查当成原生编译：
 
 ```sh
-export THEOS=~/theos
-make clean package
+python3 Scripts/generate_shader.py --check
+python3 Scripts/check_source.py
+make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide
 ```
 
-产出 `packages/com.example.noticelisttweak_1.0.1_iphoneos-arm64e.deb`。
+CI 使用真实 Apple SDK、最低 iOS15.0，输出 `com.tsangbaby.noticedeleteanimation_0.1.0~alpha8_iphoneos-arm64e.deb`。通过实际包解析、注册/依赖及逐页签名验证后才交付。
 
-RootHide 打包需要在 theos 里启用 roothide scheme，`install_name` 会被改写成
-`@loader_path/.jbroot/...`。原始包就是这样打出来的。
+## 身份及升级
 
-## 源码结构
+插件显示名、dylib、设置 bundle/可执行、PreferenceLoader注册、偏好域/通知和诊断路径均使用 NoticeDeleteAnimation 身份。作者/维护者为Tsangbaby。新包 `Conflicts/Replaces: com.example.noticelisttweak`，避免与前一重建包双重注入。现有 NoticeDeleteAnimation 同包名正常升级，不保留两套可执行文件。
 
-| 文件 | 职责 | 对应二进制 |
-|---|---|---|
-| `NLDustRenderer.{h,m}` | Metal 颗粒渲染视图 | 0x76b4–0x9140 |
-| `DustShader.metal` | 顶点/片元着色器（**原样恢复**） | `__const` 0x195e8 |
-| `NLWithdrawalEffect.{h,m}` | 消散引擎（overlay 窗口 + 生命周期） | 0x11490–0x13bb0 |
-| `NLPreferences.{h,m}` | 偏好读取、可见性判定、事件计数 | 0x6290 / 0x10a94 / 0x10c40 / 0x12b04 |
-| `NLNotificationHookLoader.{h,m}` | 安装入口、重试、%ctor | 0x58d0–0x67b4 |
-| `NLNotificationListHooks.{h,m}` | 通知列表 remove/clearAll hook | 0x67b4–0x75a0 |
-| `NLIconDust.{h,m}` | 桌面图标消散 | 0x919c–0xc39c |
-| `NLLockScreenDust.{h,m}` | 锁屏通知消散 | 0x16600–0x18c00 |
-| `NLBannerDust.{h,m}` | BannerKit 横幅消散 + 诊断写入 | 0xc478–0x10a94 |
-| `NLIslandDust.{h,m}` | 灵动岛（TrollOpen / Nice） | 0x13c70–0x16600 |
-| `NLStatusProbe.{h,m}` | 状态探测 | 0xc39c–0xc478 |
-| `NLRootListController.{h,m}` | 设置根列表 | prefs 0x6dd4–0x7120 |
-| `NLBannerStatusController.m` | 横幅状态详情页 | prefs 0x5ad4–0x6dd4 |
+偏好域为 `com.tsangbaby.noticedeleteanimation`；状态文件为该域的 `.banner-status.plist`。不自动读取或写入旧域，不搬运通知内容或旧诊断。其他功能相同的通知动画插件应禁用以免重复处理。
 
-## 验证状态（务必先读）
+## 验证与边界
 
-**本工程是静态逆向的产物，尚未编译，也未在真机验证。**
+[alpha8目标与证据](Docs/ALPHA8-PLAN.md)记录当前视频事实和门禁。设备视频显示通知行和操作按钮一起形成早期灰块，不是仅有最终帧残留；未展示点击横幅。点击路径须由源码、合成运行回归和后续设备状态区分，不能用假点击测试冒充真机通过。
 
-- 反汇编注释、类元数据、字符串表、着色器源码：来自二进制的直接证据。
-- 各函数的控制流和常量：按反汇编逐条还原，标注了原始地址。
-- 标有 `// REVERIFY:` 的地方是**推断而非证据**，见 `REVERIFY-LIST.md`。
-- 没有 iOS SDK / theos，本机无法编译，也没有真机测试。
+功能修改会有直接执行生产函数的原生回归，所有依赖替身明确标注。Metal源码能编译不等于实际GPU动画/所有材质正确。真机视觉和私有通知路径仍需用户验收。
 
-首次构建预期需要修编译错误（主要是私有 API 声明、类型签名）。
+历史重建资料、地址注释及 `REVERIFY`保留为维护依据，不把它们伪装成已验证的行为。原始上传二进制不参与构建、不会混入新包。原件和视频均只保留本地。

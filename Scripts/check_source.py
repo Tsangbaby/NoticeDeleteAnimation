@@ -23,17 +23,17 @@ class SourceContracts(unittest.TestCase):
         self.assertNotIn('static const char *NLDustMetalSource;',renderer)
     def test_metadata(self):
         c=dict(s.split(': ',1) for s in (ROOT/'control').read_text().splitlines() if ': ' in s)
-        self.assertEqual(c['Package'],'com.example.noticelisttweak')
-        self.assertEqual(c['Version'],'1.0.1+rebuild1')
+        self.assertEqual(c['Package'],'com.tsangbaby.noticedeleteanimation')
+        self.assertEqual(c['Version'],'0.1.0~alpha8')
         self.assertIn('firmware (>= 15.0)',c['Depends'])
         for directory in ('layout','prefs'):
             for f in (ROOT/directory).rglob('*.plist'):plistlib.loads(f.read_bytes())
-        stage_filter=(ROOT/'NoticeListTweak.plist').read_bytes()
-        self.assertEqual(stage_filter,(ROOT/'layout/Library/MobileSubstrate/DynamicLibraries/NoticeListTweak.plist').read_bytes())
+        stage_filter=(ROOT/'NoticeDeleteAnimation.plist').read_bytes()
+        self.assertEqual(stage_filter,(ROOT/'layout/Library/MobileSubstrate/DynamicLibraries/NoticeDeleteAnimation.plist').read_bytes())
         self.assertEqual(plistlib.loads(stage_filter),{'Filter':{'Bundles':['com.apple.springboard']}})
     def test_preferences_registration(self):
-        entry=plistlib.loads((ROOT/'layout/Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist').read_bytes())['entry']
-        info=plistlib.loads((ROOT/'layout/Library/PreferenceBundles/NoticeListTweak.bundle/Info.plist').read_bytes())
+        entry=plistlib.loads((ROOT/'layout/Library/PreferenceLoader/Preferences/com.tsangbaby.noticedeleteanimation.plist').read_bytes())['entry']
+        info=plistlib.loads((ROOT/'layout/Library/PreferenceBundles/NoticeDeleteAnimation.bundle/Info.plist').read_bytes())
         self.assertEqual(entry['bundle'],info['CFBundleExecutable']);self.assertIs(entry['isController'],True)
         self.assertEqual(entry['detail'],info['NSPrincipalClass']);self.assertEqual(info['NSPrincipalClass'],'NLRootListController')
         self.assertIn('makefiles/common.mk',(ROOT/'prefs/Makefile').read_text())
@@ -57,6 +57,44 @@ class SourceContracts(unittest.TestCase):
         self.assertNotIn('[gesture performSelector:@selector(state)]',lock)
         self.assertIn('@encode(NSInteger)',lock)
         self.assertIn('uninstall1, 3, "@"',icon)
+    def test_alpha8_identity_is_consistent(self):
+        c=dict(s.split(': ',1) for s in (ROOT/'control').read_text().splitlines() if ': ' in s)
+        self.assertEqual(c['Name'],'NoticeDeleteAnimation')
+        self.assertEqual(c['Author'],'Tsangbaby');self.assertEqual(c['Maintainer'],'Tsangbaby')
+        self.assertEqual(c['Conflicts'],'com.example.noticelisttweak');self.assertEqual(c['Replaces'],c['Conflicts'])
+        for directory in ('src','prefs','layout'):
+            for p in (ROOT/directory).rglob('*'):
+                if p.is_file() and p.suffix not in ('.png','.pyc'):
+                    s=p.read_text()
+                    self.assertNotIn('com.example.noticelisttweak',s,str(p))
+                    self.assertNotIn('NoticeListTweak',s,str(p))
+        self.assertIn('TWEAK_NAME = NoticeDeleteAnimation',(ROOT/'Makefile').read_text())
+        self.assertIn('BUNDLE_NAME = NoticeDeleteAnimation',(ROOT/'prefs/Makefile').read_text())
+    def test_alpha8_card_capture_and_banner_binding(self):
+        s=(ROOT/'src/NLNotificationDismissalSnapshot.m').read_text()
+        r=(ROOT/'src/NLDustRenderer.m').read_text()
+        b=(ROOT/'src/NLBannerDust.m').read_text()
+        w=(ROOT/'src/NLWithdrawalEffect.m').read_text()
+        self.assertIn('NLNotificationCardInRow',s)
+        self.assertIn('NLNotificationCardStillMatches',s)
+        self.assertIn('NLNotificationOpaqueInterior',s)
+        self.assertIn('[window drawViewHierarchyInRect:',s)
+        self.assertIn('kCGBlendModeDestinationIn',s)
+        self.assertIn('renderer.completion',s)
+        self.assertIn('self.invalidated = YES',r)
+        self.assertIn('status != MTLCommandBufferStatusCompleted',r)
+        self.assertIn('[self removeFromSuperview]',r)
+        self.assertNotIn('NLBannerFindRequest(',b)
+        self.assertNotIn('notificationIdentifier',b)
+        self.assertIn('NLBannerResolveRequest',b)
+        self.assertIn('effect ? NO : animated',b)
+        self.assertIn('NLBannerDismissInProgress = NO',b)
+        self.assertIn('NLMakeRenderGeometry(cardRect',w)
+        self.assertIn('cardFrame:localCard',w)
+        self.assertIn('renderer.frame = rendererFrame',w)
+        workflow=(ROOT/'.github/workflows/roothide-rebuild.yml').read_text()
+        for name in ('test_renderer_native.sh','test_banner_native.sh','test_geometry_native.sh'):
+            self.assertIn(name,workflow)
     def test_no_original_binary_fallback_or_stubs(self):
         self.assertFalse((ROOT/'pkg').exists())
         for p in (ROOT/'src').glob('*.m'):

@@ -1,6 +1,6 @@
 //
 //  NLNotificationHookLoader.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个函数上方。
 //
@@ -101,16 +101,16 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
     Method removeMethod = class_getInstanceMethod(listViewClass,
                                                   @selector(_visibleViewAtIndex:));
     if (!removeMethod) {
-        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        NSLog(@"[NoticeDeleteAnimation] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
     if (method_getNumberOfArguments(removeMethod) != 3) {
-        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        NSLog(@"[NoticeDeleteAnimation] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
     char *returnType = method_copyReturnType(removeMethod);
     if (!returnType) {
-        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        NSLog(@"[NoticeDeleteAnimation] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
     // 返回值类型里含 rnNoORV 中任一字符（struct/void 编码）视为不可用
@@ -123,13 +123,13 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
     }
     free(returnType);
     if (badReturn) {
-        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        NSLog(@"[NoticeDeleteAnimation] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
     // Reconstructed calls require object return and an NSUInteger index.
     const char *indexArgument[] = { @encode(NSUInteger) };
     if (!NLABIMethod(listViewClass, @selector(_visibleViewAtIndex:), "@", 1, indexArgument)) {
-        NSLog(@"[NoticeListTweak] native list accessor signature unsupported; hooks disabled");
+        NSLog(@"[NoticeDeleteAnimation] native list accessor signature unsupported; hooks disabled");
         return NO;
     }
 
@@ -184,7 +184,7 @@ static BOOL NLNativeHooksInstalled;      // 0x264e0
         if (rt) free(rt);
     }
 
-    NSLog(@"[NoticeListTweak] native list hooks ready: basic=%d displaced=%d",
+    NSLog(@"[NoticeDeleteAnimation] native list hooks ready: basic=%d displaced=%d",
           NLOriginalRemove != NULL, NLOriginalRemoveDisplaced != NULL);
 
     return NLNativeHooksInstalled;
@@ -244,7 +244,7 @@ static void NLSetup(void)
                      object:nil];
         [center addObserver:loader
                    selector:@selector(preferencesChanged:)
-                       name:@"com.example.noticelisttweak/preferencesChanged"
+                       name:@"com.tsangbaby.noticedeleteanimation/preferencesChanged"
                      object:nil];
         [center addObserver:loader
                    selector:@selector(applicationDidBecomeActive:)

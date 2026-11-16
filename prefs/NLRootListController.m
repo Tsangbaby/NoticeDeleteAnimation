@@ -1,6 +1,6 @@
 //
 //  NLRootListController.m
-//  NoticeListTweak Preferences — 通知消散
+//  NoticeDeleteAnimation Preferences — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个方法上方。
 //
@@ -8,11 +8,11 @@
 #import "NLRootListController.h"
 #import <Preferences/PSSpecifier.h>
 
-static NSString *const kNLPreferencesDomain = @"com.example.noticelisttweak";
+static NSString *const kNLPreferencesDomain = @"com.tsangbaby.noticedeleteanimation";
 static NSString *const kNLStatusPlistPath __attribute__((unused)) =
-    @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
+    @"/var/mobile/Library/Preferences/com.tsangbaby.noticedeleteanimation.banner-status.plist";
 static NSString *const kNLPreferencesChangedNotification =
-    @"com.example.noticelisttweak/preferencesChanged";
+    @"com.tsangbaby.noticedeleteanimation/preferencesChanged";
 
 
 #pragma mark - NLRootListController
@@ -25,7 +25,7 @@ static NSString *const kNLPreferencesChangedNotification =
     if (!_specifiers) {
         NSBundle *bundle = [NSBundle bundleForClass:[self class]];
         _specifiers = [self loadSpecifiersFromPlistName:@"Root" target:self bundle:bundle];
-        [self setTitle:@"通知消散"];
+        [self setTitle:@"NoticeDeleteAnimation"];
     }
     return _specifiers;
 }

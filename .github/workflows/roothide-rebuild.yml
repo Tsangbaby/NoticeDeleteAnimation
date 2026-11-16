@@ -1,4 +1,4 @@
-name: NoticeListTweak reconstructed RootHide build
+name: NoticeDeleteAnimation reconstructed RootHide build
 on:
   workflow_dispatch:
   push:
@@ -78,6 +78,17 @@ jobs:
         if: success()
         shell: bash
         run: bash Scripts/test_runtime_native.sh
+      - name: Shared renderer viewport geometry regression
+        shell: bash
+        run: bash Scripts/test_geometry_native.sh
+      - name: Renderer and card-only capture regression
+        if: success()
+        shell: bash
+        run: bash Scripts/test_renderer_native.sh
+      - name: Banner request binding and original-dismiss regression
+        if: success()
+        shell: bash
+        run: bash Scripts/test_banner_native.sh
       - name: Validate actual reconstructed package
         shell: bash
         run: |
@@ -92,7 +103,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: NoticeListTweak-roothide-${{ github.sha }}
+          name: NoticeDeleteAnimation-roothide-${{ github.sha }}
           path: |
             packages/*.deb
             build-evidence/

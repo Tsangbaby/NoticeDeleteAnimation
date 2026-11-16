@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     NSBundle *bundle = [NSBundle bundleWithPath:path];
     NSDictionary *entry = [NSDictionary dictionaryWithContentsOfFile:@(argv[2])][@"entry"];
     require(bundle && [entry isKindOfClass:NSDictionary.class], @"missing bundle/entry");
-    require([entry[@"bundle"] isEqual:@"NoticeListTweak"] && [entry[@"detail"] isEqual:@"NLRootListController"], @"registration identity");
+    require([entry[@"bundle"] isEqual:@"NoticeDeleteAnimation"] && [entry[@"detail"] isEqual:@"NLRootListController"], @"registration identity");
     NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:[bundle pathForResource:@"Root" ofType:@"plist"]];
     NSArray *items = plist[@"items"];
     require([items isKindOfClass:NSArray.class] && items.count > 0, @"Root.items array required");
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     require(specs.count == items.count, @"Root.items count");
     Ivar model = class_getInstanceVariable(PSListController.class, "_specifiers");
     require(model && object_getIvar(root, model) == specs && root.specifiers == specs, @"superclass model/cache");
-    NSDictionary *names = @{@"Enabled":@"通知消散", @"DustDuration":@"消散时长（秒）", @"DustDistance":@"飘散距离", @"DustParticles":@"颗粒精细度", @"BannerRuntimeStatus":@"横幅运行状态"};
+    NSDictionary *names = @{@"Enabled":@"NoticeDeleteAnimation", @"DustDuration":@"消散时长（秒）", @"DustDistance":@"飘散距离", @"DustParticles":@"颗粒精细度", @"BannerRuntimeStatus":@"横幅运行状态"};
     NSMutableSet *seen = [NSMutableSet set];
     for (PSSpecifier *s in specs) {
         NSString *ident = [s propertyForKey:@"key"] ?: [s propertyForKey:@"id"];
@@ -56,14 +56,14 @@ int main(int argc, char **argv) {
     NLBannerStatusController *status = [statusClass new];
     // Pure formatter: no preferences IO or clipboard writes.
     NSString *empty = [status statusTextForStatus:nil events:nil];
-    NSString *label = @"设置组件版本：1.0.1+rebuild1";
+    NSString *label = @"设置组件版本：0.1.0~alpha8";
     contains(empty, @[label, @"尚未读到", @"SpringBoard 运行状态"]);
     NSDictionary *events = @{@"native-dismiss-seen":@7, @"snapshot-ready":@11, @"dust-started":@13};
     NSDictionary *fixture = @{@"build":@"fixture-build", @"loaded":@YES, @"updatedAt":@"fixture-time", @"installed":@YES, @"trollOpenCurrentHook":@NO, @"metalReady":@NO, @"reduceMotion":@YES, @"lastSource":@"fixture-source", @"lastViewClass":@"FixtureCard", @"events":events};
     contains([status statusTextForStatus:fixture events:events], @[label, @"桌面运行版本：fixture-build已加载", @"更新：fixture-time", @"系统横幅：已接入", @"TrollOpen：未接入", @"Metal：未就绪", @"减弱动态效果：开（跳过效果）", @"系统收回：7 次", @"快照就绪：11 次", @"启动颗粒：13 次", @"来源：fixture-source", @"卡片类：FixtureCard"]);
     contains([status statusTextForStatus:@{} events:@{@"dust-started":@"invalid"}], @[label, @"桌面运行版本：未知（请重新载入桌面）", @"系统收回：0 次", @"启动颗粒：0 次", @"Metal：未加载", @"来源：未知"]);
     UIApplication *app = [UIApplication sharedApplication];
-    if (app.connectedScenes.count && ![[NSFileManager defaultManager] fileExistsAtPath:@"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist"]) {
+    if (app.connectedScenes.count && ![[NSFileManager defaultManager] fileExistsAtPath:@"/var/mobile/Library/Preferences/com.tsangbaby.noticedeleteanimation.banner-status.plist"]) {
         [root loadViewIfNeeded];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:root];
         [root showBannerStatus];

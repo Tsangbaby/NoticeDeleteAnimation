@@ -1,6 +1,6 @@
 //
 //  NLNotificationHookLoader.h
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 
 #import <Foundation/Foundation.h>

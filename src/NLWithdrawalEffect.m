@@ -1,6 +1,6 @@
 //
 //  NLWithdrawalEffect.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个函数上方。
 //
@@ -8,6 +8,7 @@
 #import "NLWithdrawalEffect.h"
 #import "NLDustRenderer.h"
 #import "NLPreferences.h"
+#import "NLRenderGeometry.h"
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -263,9 +264,16 @@ char NLSourceEffectKey;            // 0x265f8（定义，声明见 NLPreferences
         distance = NLDustDistance;
     }
 
+    CGRect rendererFrame, localCard;
+    if (!NLMakeRenderGeometry(cardRect, overlay.bounds, distance, &rendererFrame, &localCard)) {
+        overlay.hidden = YES;
+        overlay.rootViewController = nil;
+        NLWithdrawalRecord(@"skip:invalid-render-geometry");
+        return nil;
+    }
     NLDustRenderer *renderer =
         [[NLDustRenderer alloc] initWithImage:image.CGImage
-                                    cardFrame:cardRect
+                                    cardFrame:localCard
                                 particleCount:kNLPrepareParticles
                                      duration:duration
                                      distance:distance
@@ -276,7 +284,7 @@ char NLSourceEffectKey;            // 0x265f8（定义，声明见 NLPreferences
     }
 
     [root.view addSubview:renderer];
-    renderer.frame = cardRect;
+    renderer.frame = rendererFrame;
 
     UIImageView *cover = [[UIImageView alloc] initWithImage:image];
     cover.frame = cardRect;

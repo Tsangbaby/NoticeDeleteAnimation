@@ -1,6 +1,6 @@
 //
 //  NLIconDust.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  桌面图标卸载时的消散。逆向自 1.0.1~test14，地址见各函数。
 //
@@ -556,7 +556,7 @@ BOOL NLInstallIconDustHooks(void)
     NLIconHooksInstalled = (NLOriginalUninstall1 || NLOriginalUninstall2 ||
                             NLOriginalUninstall3 || NLOriginalRemove3);
 
-    NSLog(@"[NoticeListTweak] icon hooks: uninstall=%d/%d/%d remove=%d model=%d",
+    NSLog(@"[NoticeDeleteAnimation] icon hooks: uninstall=%d/%d/%d remove=%d model=%d",
           NLOriginalUninstall1 != NULL,
           NLOriginalUninstall2 != NULL,
           NLOriginalUninstall3 != NULL,

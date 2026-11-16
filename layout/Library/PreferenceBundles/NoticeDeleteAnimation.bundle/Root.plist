@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>title</key>
-    <string>通知消散</string>
+    <string>NoticeDeleteAnimation</string>
     <key>items</key>
     <array>
     <dict>
@@ -18,31 +18,31 @@
         <key>cell</key>
         <string>PSSwitchCell</string>
         <key>label</key>
-        <string>通知消散</string>
+        <string>NoticeDeleteAnimation</string>
         <key>default</key>
         <true/>
         <key>defaults</key>
-        <string>com.example.noticelisttweak</string>
+        <string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key>
         <string>Enabled</string>
         <key>PostNotification</key>
-        <string>com.example.noticelisttweak/preferencesChanged</string>
+        <string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key><string>PSSwitchCell</string>
         <key>label</key><string>桌面图标消散</string>
         <key>default</key><true/>
-        <key>defaults</key><string>com.example.noticelisttweak</string>
+        <key>defaults</key><string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key><string>HomeIconDustEnabled</string>
-        <key>PostNotification</key><string>com.example.noticelisttweak/preferencesChanged</string>
+        <key>PostNotification</key><string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key><string>PSSwitchCell</string>
         <key>label</key><string>来消息横幅消散</string>
         <key>default</key><true/>
-        <key>defaults</key><string>com.example.noticelisttweak</string>
+        <key>defaults</key><string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key><string>BannerDustEnabled</string>
-        <key>PostNotification</key><string>com.example.noticelisttweak/preferencesChanged</string>
+        <key>PostNotification</key><string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key><string>PSGroupCell</string>
@@ -68,11 +68,11 @@
         <key>showValue</key>
         <true/>
         <key>defaults</key>
-        <string>com.example.noticelisttweak</string>
+        <string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key>
         <string>DustDuration</string>
         <key>PostNotification</key>
-        <string>com.example.noticelisttweak/preferencesChanged</string>
+        <string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key>
@@ -88,11 +88,11 @@
         <key>showValue</key>
         <true/>
         <key>defaults</key>
-        <string>com.example.noticelisttweak</string>
+        <string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key>
         <string>DustDistance</string>
         <key>PostNotification</key>
-        <string>com.example.noticelisttweak/preferencesChanged</string>
+        <string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key><string>PSSliderCell</string>
@@ -101,9 +101,9 @@
         <key>min</key><real>4000</real>
         <key>max</key><real>20000</real>
         <key>showValue</key><true/>
-        <key>defaults</key><string>com.example.noticelisttweak</string>
+        <key>defaults</key><string>com.tsangbaby.noticedeleteanimation</string>
         <key>key</key><string>DustParticles</string>
-        <key>PostNotification</key><string>com.example.noticelisttweak/preferencesChanged</string>
+        <key>PostNotification</key><string>com.tsangbaby.noticedeleteanimation/preferencesChanged</string>
     </dict>
     <dict>
         <key>cell</key>

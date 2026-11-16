@@ -1,6 +1,6 @@
 //
 //  NLPreferences.m
-//  NoticeListTweak — 通知消散
+//  NoticeDeleteAnimation — 通知消散
 //
 //  逆向自 1.0.1~test14。原始地址写在每个函数上方。
 //
@@ -9,7 +9,7 @@
 #import "NLWithdrawalEffect.h"
 #import <objc/runtime.h>
 
-NSString *const NLAppID = @"com.example.noticelisttweak";
+NSString *const NLAppID = @"com.tsangbaby.noticedeleteanimation";
 
 // ---------------------------------------------------------------- 全局配置
 // 二进制里的 __ZL* 变量，地址见注释。全部由 NLLoadPreferences 写入。

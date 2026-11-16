@@ -44,7 +44,7 @@ def parse_macho(data,kind,shader):
         assert minimum==0xf0000 and cs
         assert not any('/var/jb' in d for d in deps)
         if kind=='main':
-            assert ident=='@loader_path/.jbroot/Library/MobileSubstrate/DynamicLibraries/NoticeListTweak.dylib',ident
+            assert ident=='@loader_path/.jbroot/Library/MobileSubstrate/DynamicLibraries/NoticeDeleteAnimation.dylib',ident
             assert any('substrate' in d for d in deps) and any('Metal.framework' in d for d in deps)
             assert shader in thin,'actual shader text missing from rebuilt binary'
             for cls in ('NLDustRenderer','NLWithdrawalEffect','NLNotificationDismissalSnapshot','NLNotificationHookLoader'):
@@ -89,21 +89,31 @@ def check(deb,extract=None):
     controls=untar(next(v for k,v in members.items() if k.startswith('control.tar')))
     text=controls['control'].decode()
     fields=dict(s.split(': ',1) for s in text.splitlines() if ': ' in s and not s.startswith(' '))
-    for key,val in {'Package':'com.example.noticelisttweak','Version':'1.0.1+rebuild1','Architecture':'iphoneos-arm64e'}.items():assert fields[key]==val,(key,fields[key])
+    for key,val in {'Package':'com.tsangbaby.noticedeleteanimation','Name':'NoticeDeleteAnimation','Version':'0.1.0~alpha8','Author':'Tsangbaby','Maintainer':'Tsangbaby','Architecture':'iphoneos-arm64e'}.items():assert fields[key]==val,(key,fields[key])
+    assert fields['Conflicts']=='com.example.noticelisttweak' and fields['Replaces']==fields['Conflicts']
     assert 'preferenceloader' in fields['Depends'] and 'firmware (>= 15.0)' in fields['Depends']
     files=untar(next(v for k,v in members.items() if k.startswith('data.tar')))
-    main='Library/MobileSubstrate/DynamicLibraries/NoticeListTweak.dylib'
-    bundle='Library/PreferenceBundles/NoticeListTweak.bundle/'
-    prefs=bundle+'NoticeListTweak'
-    entry='Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist'
+    main='Library/MobileSubstrate/DynamicLibraries/NoticeDeleteAnimation.dylib'
+    bundle='Library/PreferenceBundles/NoticeDeleteAnimation.bundle/'
+    prefs=bundle+'NoticeDeleteAnimation'
+    entry='Library/PreferenceLoader/Preferences/com.tsangbaby.noticedeleteanimation.plist'
     allowed={main,main.removesuffix('.dylib')+'.plist',entry,prefs,bundle+'Info.plist',bundle+'Root.plist'}
     allowed.update(bundle+p for p in ('icon.png','Logo.png','icon@2x.png','icon@3x.png'))
     assert set(files)<=allowed,(set(files)-allowed)
     assert {main,prefs,entry,bundle+'Info.plist',bundle+'Root.plist'}<=set(files)
-    registration=plistlib.loads(files[entry])['entry'];assert registration['bundle']=='NoticeListTweak' and registration['detail']=='NLRootListController' and registration['isController'] is True
-    info=plistlib.loads(files[bundle+'Info.plist']);assert info['NSPrincipalClass']=='NLRootListController' and info['CFBundleExecutable']=='NoticeListTweak'
+    registration=plistlib.loads(files[entry])['entry'];assert registration['bundle']=='NoticeDeleteAnimation' and registration['detail']=='NLRootListController' and registration['isController'] is True
+    info=plistlib.loads(files[bundle+'Info.plist']);assert info['NSPrincipalClass']=='NLRootListController' and info['CFBundleExecutable']=='NoticeDeleteAnimation'
     filter_data=plistlib.loads(files[main.removesuffix('.dylib')+'.plist']);assert 'SpringBoard' in str(filter_data) or 'com.apple.springboard' in str(filter_data)
-    root_plist=plistlib.loads(files[bundle+'Root.plist']);assert root_plist
+    root_plist=plistlib.loads(files[bundle+'Root.plist']);assert root_plist['title']=='NoticeDeleteAnimation'
+    assert info['CFBundleIdentifier']=='com.tsangbaby.noticedeleteanimation.preferences'
+    assert info['CFBundleDisplayName']=='NoticeDeleteAnimation' and registration['label']=='NoticeDeleteAnimation'
+    for item in root_plist['items']:
+        if 'defaults' in item:assert item['defaults']=='com.tsangbaby.noticedeleteanimation'
+        if 'PostNotification' in item:assert item['PostNotification']=='com.tsangbaby.noticedeleteanimation/preferencesChanged'
+    for name,data in files.items():
+        assert 'NoticeListTweak' not in name and 'com.example.' not in name
+        if name.endswith(('.dylib','NoticeDeleteAnimation')):
+            assert b'com.example.noticelisttweak' not in data and b'[NoticeListTweak]' not in data
     shader=(ROOT/'src/DustShader.metal').read_bytes()
     binaries={}
     for kind,name in [('main',main),('prefs',prefs)]:

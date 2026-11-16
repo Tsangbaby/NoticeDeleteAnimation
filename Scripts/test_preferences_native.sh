@@ -42,10 +42,10 @@ PY
   arch="$(uname -m)"
   case "$arch" in arm64|x86_64) ;; *) echo "FAIL: unsupported simulator architecture $arch"; return 1;; esac
   work="$PWD/build-evidence/preferences-smoke"
-  bundle="$work/NoticeListTweak.bundle"
+  bundle="$work/NoticeDeleteAnimation.bundle"
   mkdir -p "$bundle" "$work/link/Preferences.framework"
-  cp -R layout/Library/PreferenceBundles/NoticeListTweak.bundle/. "$bundle/"
-  cp layout/Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist "$work/entry.plist"
+  cp -R layout/Library/PreferenceBundles/NoticeDeleteAnimation.bundle/. "$bundle/"
+  cp layout/Library/PreferenceLoader/Preferences/com.tsangbaby.noticedeleteanimation.plist "$work/entry.plist"
   # Link-only exports; runtime class images are checked.
   cat > "$work/link/Preferences.framework/Preferences.tbd" <<'TBD'
 --- !tapi-tbd
@@ -60,9 +60,9 @@ exports:
 TBD
   local flags=(-target "$arch-apple-ios15.0-simulator" -isysroot "$sdk" -fobjc-arc -Werror=objc-method-access -Wno-deprecated-declarations -I "$headers" -I prefs -F "$work/link")
   local frameworks=(-framework UIKit -framework Foundation -framework CoreFoundation -framework Preferences)
-  xcrun --sdk iphonesimulator clang "${flags[@]}" -dynamiclib prefs/NLRootListController.m prefs/NLBannerStatusController.m "${frameworks[@]}" -o "$bundle/NoticeListTweak"
+  xcrun --sdk iphonesimulator clang "${flags[@]}" -dynamiclib prefs/NLRootListController.m prefs/NLBannerStatusController.m "${frameworks[@]}" -o "$bundle/NoticeDeleteAnimation"
   xcrun --sdk iphonesimulator clang "${flags[@]}" Tests/PreferencesSmoke/main.m "${frameworks[@]}" -o "$work/preferences-smoke"
-  codesign -f -s - "$bundle/NoticeListTweak"
+  codesign -f -s - "$bundle/NoticeDeleteAnimation"
   codesign -f -s - "$work/preferences-smoke"
   xcrun simctl spawn "$udid" "$work/preferences-smoke" "$bundle" "$work/entry.plist"
 }
