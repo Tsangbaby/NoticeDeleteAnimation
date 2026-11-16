@@ -17,7 +17,7 @@ static id<MTLCommandQueue> NLDustQueue;        // 0x26518
 static id<MTLRenderPipelineState> NLDustPipeline;  // 0x26520
 static BOOL NLDustReady;                       // 0x26528
 static BOOL NLDustPreparing;                   // 0x26529
-static BOOL NLDustPrepared;                    // 0x2652a
+static BOOL NLDustPrepared __attribute__((unused)); // 0x2652a, retained reconstruction metadata
 
 // 0x195e8 起是内嵌的 Metal 源码字符串
 extern const char *NLDustMetalSource; // deterministic source generated from DustShader.metal
@@ -29,15 +29,15 @@ static BOOL NLDustWarmupStarted;   // 0x26529 —— 与 NLDustPreparing 同字�
 // 0x195c8 = 2.2    （卡片外扩边距系数）
 // 0x195e0 = 0.1    （duration 下限）
 // 0x4a50 起：宽>=16、高>=12；面积上限 0x4f8000000000 → 16384×16384 像素？见下
-static const double kNLMinVisibleAlpha = 0.02;
-static const double kNLInsetScale = 2.2;
+static const double kNLMinVisibleAlpha __attribute__((unused)) = 0.02;
+static const double kNLInsetScale __attribute__((unused)) = 2.2;
 static const double kNLMinDuration = 0.1;
 static const double kNLMaxContentsScale = 2.0;
 
 // 纹理像素上限：0x124f80 = 1,200,000（由 movz 0x4f80 + movk 0x12,lsl16 拼成）
 static const NSUInteger NLDustMaxTexturePixels = 0x124f80;
 // 单边上限：0x1000 = 4096
-static const NSUInteger NLDustMaxTextureSide = 0x1000;
+static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
 
 
 #pragma mark - NLDustWarmup

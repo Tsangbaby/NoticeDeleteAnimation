@@ -9,7 +9,7 @@
 #import <Preferences/PSSpecifier.h>
 
 static NSString *const kNLPreferencesDomain = @"com.example.noticelisttweak";
-static NSString *const kNLStatusPlistPath =
+static NSString *const kNLStatusPlistPath __attribute__((unused)) =
     @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
 static NSString *const kNLPreferencesChangedNotification =
     @"com.example.noticelisttweak/preferencesChanged";

@@ -51,13 +51,19 @@ jobs:
           python3 Scripts/generate_shader.py --check
           python3 Scripts/source_manifest.py --check
           python3 Scripts/check_source.py 2>&1 | tee build-evidence/source-checks.txt
+      - name: Actual Apple SDK all-source diagnostics
+        if: success() || failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash Scripts/check_native_sources.sh 2>&1 | tee build-evidence/native-source-checks.txt
       - name: Native arm64 and arm64e compile and RootHide package
         if: success() || failure()
         shell: bash
         run: |
           set -euo pipefail
           make clean
-          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide 2>&1 | tee build-evidence/build.txt
+          make -k package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=roothide 2>&1 | tee build-evidence/build.txt
       - name: Actual Metal shader compilation
         if: success() || failure()
         shell: bash

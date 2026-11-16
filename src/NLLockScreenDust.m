@@ -26,7 +26,7 @@ static IMP NLCellClearOriginal;              // 0x26650
 static IMP NLCellSetContentOriginal;         // 0x26658
 static IMP NLCellPanOriginal;                // 0x26660
 static IMP NLCollectionDeleteOriginal;       // 0x26668
-static NSUInteger NLClearDepth;              // 0x26670
+static NSUInteger NLClearDepth __attribute__((unused)); // 0x26670, recovered metadata
 static NSUInteger NLLockClears;              // 0x26678
 static NSUInteger NLLockCollectionDeletes;   // 0x26680
 

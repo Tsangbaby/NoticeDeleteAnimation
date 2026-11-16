@@ -16,7 +16,7 @@
 // 全局配置变量定义在 NLPreferences.m
 
 // 静态阈值（0x195xx 常量池）
-static const double kNLMinVisibleAlpha = 0.02;     // 0x195c0
+static const double kNLMinVisibleAlpha __attribute__((unused)) = 0.02; // 0x195c0, recovered metadata
 static const double kNLFullscreenFactor = 0.8;     // 0x195d0
 static const double kNLMaxOverlayScale = 2.0;
 static const double kNLFrameTimeout = 0.6;         // 0x3fe3333333333333

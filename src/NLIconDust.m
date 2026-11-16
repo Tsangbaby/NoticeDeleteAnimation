@@ -39,7 +39,7 @@ static id NLIconGet(id icon, SEL sel);
 
 /// 0xa3e0 —— 从 method 的类型编码推断"这个 selector 属于哪类图标操作"。
 /// 返回 1/2/3 表示 uninstall 的三个 overload，4 表示 removeIcon，0 表示不认识。
-static int NLIconType(Method method, int argc, const char *retType)
+static __attribute__((unused)) int NLIconType(Method method, int argc, const char *retType)
 {
     if (!method) {
         return 0;

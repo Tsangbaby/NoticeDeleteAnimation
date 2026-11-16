@@ -9,10 +9,10 @@
 
 static NSString *const kNLStatusPlistPath =
     @"/var/mobile/Library/Preferences/com.example.noticelisttweak.banner-status.plist";
-static NSString *const kNLBuildVersion = @"1.0.1+rebuild1";
+static NSString *const kNLBuildVersion __attribute__((unused)) = @"1.0.1+rebuild1";
 
 // 事件键 → 中文说明（顺序与原实现一致）
-static NSArray<NSArray<NSString *> *> *NLEventDescriptions(void)
+static __attribute__((unused)) NSArray<NSArray<NSString *> *> *NLEventDescriptions(void)
 {
     static NSArray<NSArray<NSString *> *> *table;
     static dispatch_once_t once;
@@ -69,7 +69,8 @@ static NSString *NLCountText(NSDictionary *events, NSString *key)
 - (void)loadView
 {
     UIView *root = [[UIView alloc] initWithFrame:UIScreen.mainScreen.bounds];
-    [self setView:root];
+    // This custom status page owns a UIView, not PSListController's table view.
+    [(UIViewController *)self setView:root];
     root.backgroundColor = [UIColor systemBackgroundColor];
 
     UITextView *text = [[UITextView alloc] initWithFrame:root.bounds];
