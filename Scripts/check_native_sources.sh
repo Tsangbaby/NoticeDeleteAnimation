@@ -15,7 +15,8 @@ for arch in arm64 arm64e; do
       -fobjc-arc -fblocks -fsyntax-only -ferror-limit=0 -Wall -Wextra \
       -Werror=implicit-function-declaration -Werror=incompatible-pointer-types \
       -Werror=objc-method-access -Wno-deprecated-declarations \
-      -I "$headers" -I "$THEOS/vendor/include" -I src -I prefs "$source" || status=1
+      -I "$headers" -I "$THEOS/vendor/include" -F "$THEOS/vendor/lib" \
+      -I src -I prefs "$source" || status=1
   done
 done
 if [ "$status" -eq 0 ]; then echo 'NATIVE SOURCE PASS: actual Apple SDK both architectures (not link or runtime)'; fi

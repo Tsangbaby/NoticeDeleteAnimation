@@ -124,7 +124,7 @@ char NLSourceEffectKey;            // 0x265f8（定义，声明见 NLPreferences
     BOOL reduceMotion = UIAccessibilityIsReduceMotionEnabled();
     BOOL visible = NLVisible(view);
 
-    BOOL hasCache = NO;
+    BOOL hasCache __attribute__((unused)) = NO; // recovered branch bookkeeping
     BOOL hasWindow = NO;
     if (visible) {
         hasWindow = YES;
