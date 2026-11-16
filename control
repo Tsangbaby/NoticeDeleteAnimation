@@ -1,9 +1,10 @@
-Package: com.tsangbaby.noticedeleteanimation
-Name: NoticeDeleteAnimation
-Version: 0.1.0~alpha7
-Architecture: iphoneos-arm
-Description: Swift-driven particle dissolve effect for notification removal. Source candidate, device validation required.
-Maintainer: Tsangbaby
-Author: Tsangbaby
+Package: com.example.noticelisttweak
+Name: 通知消散
+Version: 1.0.1
+Architecture: iphoneos-arm64e
+Description: RootHide notification-list, app-icon and banner dust effects; experimental device test.
+Maintainer: Local User
+Author: Local User
 Section: Tweaks
-Depends: mobilesubstrate, preferenceloader, firmware (>= 15.0)
+Depends: mobilesubstrate, preferenceloader
+Installed-Size: 673

@@ -1,18 +1,31 @@
 ARCHS = arm64 arm64e
-TARGET = iphone:clang:latest:15.0
+TARGET = iphone:clang:16.5:15.0
 INSTALL_TARGET_PROCESSES = SpringBoard
-# Use a matching upstream or RootHide Theos. Override at invocation, never infer jailbreak paths.
-THEOS_PACKAGE_SCHEME ?= rootless
 
 include $(THEOS)/makefiles/common.mk
-TWEAK_NAME = NoticeDeleteAnimation
-NoticeDeleteAnimation_FILES = $(wildcard Sources/Core/*.swift) $(wildcard Sources/Tweak/*.swift) $(wildcard Sources/Bridge/*.m)
-NoticeDeleteAnimation_SWIFT_BRIDGING_HEADER = Sources/Bridge/NDABridge.h
-NoticeDeleteAnimation_SWIFT_VERSION = 5
-NoticeDeleteAnimation_CFLAGS = -fobjc-arc -Wall -Wextra
-NoticeDeleteAnimation_SWIFTFLAGS = -O
-NoticeDeleteAnimation_FRAMEWORKS = UIKit QuartzCore Foundation
-NoticeDeleteAnimation_LIBRARIES = substrate
+
+TWEAK_NAME = NoticeListTweak
+
+NoticeListTweak_FILES = src/NLDustRenderer.m \
+                        src/NLWithdrawalEffect.m \
+                        src/NLPreferences.m \
+                        src/NLNotificationHookLoader.m \
+                        src/NLNotificationListHooks.m \
+                        src/NLIconDust.m \
+                        src/NLLockScreenDust.m \
+                        src/NLBannerDust.m \
+                        src/NLIslandDust.m \
+                        src/NLStatusProbe.m
+NoticeListTweak_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+NoticeListTweak_FRAMEWORKS = UIKit Foundation QuartzCore CoreGraphics Metal
+NoticeListTweak_PRIVATE_FRAMEWORKS = Preferences
+NoticeListTweak_LIBRARIES = substrate
+NoticeListTweak_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
+
 include $(THEOS_MAKE_PATH)/tweak.mk
-SUBPROJECTS += Preferences
+
+SUBPROJECTS += prefs
 include $(THEOS_MAKE_PATH)/aggregate.mk
+
+after-install::
+	install.exec "killall -9 SpringBoard"

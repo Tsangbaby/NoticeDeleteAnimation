@@ -1,11 +1,4 @@
-.DS_Store
-.build/
-.swiftpm/
-.theos/
-.ci-theos/
-.ci-frameworks/
-build-evidence/
+work/
 packages/
-__pycache__/
-*.pyc
-*.dSYM/
+.theos/
+*.deb
