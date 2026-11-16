@@ -255,7 +255,8 @@ static void CaptureAndLifecycleTests(void) {
     Check(s.sourceView == row && objc_getAssociatedObject(row, &NLDustSnapshotKey) == s,
           "deduplication/removal identity remains the original row");
     Check(Snapshot() == nil, "duplicate row snapshot rejected");
-    const unsigned char *pixels = t.bytes.bytes;
+    NSData *baselinePixels = [t.bytes copy];
+    const unsigned char *pixels = baselinePixels.bytes;
     Check(pixels[3] == 0, "rounded card corner stays transparent, no wallpaper rectangle");
     NSUInteger center = 80 * t.stride + 200 * 4;
     Check(pixels[center + 3] == 255, "opaque card interior preserved without blanket opacity reduction");
@@ -288,7 +289,7 @@ static void CaptureAndLifecycleTests(void) {
     Check(Snapshot() == nil, "half-alpha interior fails closed instead of applying composited opacity twice");
     card.failure = 0; NoLeaks();
     card.failure = 4; s = Snapshot();
-    Check(s != nil && memcmp(device.texture.bytes.bytes + center, pixels + center, 4) == 0,
+    Check(s != nil && memcmp(device.texture.bytes.bytes + center, baselinePixels.bytes + center, 4) == 0,
           "isolated grey material RGB is replaced by actual window colour, without a grey-pixel filter");
     [s cleanUp]; NoLeaks();
     for (UIView *v in card.subviews) v.hidden = YES;

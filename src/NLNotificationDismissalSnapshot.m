@@ -95,9 +95,16 @@ static BOOL NLNotificationOpaqueInterior(CGImageRef image)
             UInt8 a = bytes[y * stride + x * 4 + 3];
             if (a == 0 || a == 255) continue;
             BOOL edge = NO;
-            for (int dy = -1; dy <= 1; ++dy)
-                for (int dx = -1; dx <= 1; ++dx)
-                    if (bytes[(size_t)((NSInteger)y + dy) * stride + (size_t)((NSInteger)x + dx) * 4 + 3] == 0) edge = YES;
+            // Real UIKit's 2x rounded-edge reconstruction has a two-pixel
+            // coverage fringe. Keep its alpha unchanged, including image borders;
+            // reject fractional alpha farther inside rather than double-composite.
+            for (int dy = -2; dy <= 2; ++dy) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    NSInteger yy = (NSInteger)y + dy, xx = (NSInteger)x + dx;
+                    if (yy < 0 || xx < 0 || yy >= (NSInteger)height || xx >= (NSInteger)width ||
+                        bytes[(size_t)yy * stride + (size_t)xx * 4 + 3] == 0) edge = YES;
+                }
+            }
             if (!edge) { valid = NO; break; }
         }
     }

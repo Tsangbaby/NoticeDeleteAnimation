@@ -202,7 +202,13 @@ static void Run(FixtureBN *bn, FixtureHost *host, UIView *card, Class requestCla
         CHECK([animatedHistory isEqual:@[@(flag != 0)]]); // prepare nil preserves both flags
         Reset(wrapper); island = YES; NativeOnly(bn, flag);
         Reset(wrapper);
-        dispatch_sync(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{ NativeOnly(bn, flag); });
+        dispatch_semaphore_t done = dispatch_semaphore_create(0);
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+            CHECK(!NSThread.isMainThread); // dispatch_sync is allowed to inline on the caller
+            NativeOnly(bn, flag);
+            dispatch_semaphore_signal(done);
+        });
+        CHECK(dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) == 0);
     }
     Reset(wrapper); pending = YES; NativeOnly(bn, YES);
     Reset(wrapper); prepareMode = 1; Dismiss(bn, YES);
