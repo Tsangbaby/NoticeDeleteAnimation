@@ -49,7 +49,7 @@ PY
     -Werror=implicit-function-declaration -Wno-unused-parameter -Wno-deprecated-declarations \
     -I Tests/RuntimeSmoke -I src \
     Tests/RuntimeSmoke/main.m src/NLNotificationHookLoader.m \
-    -framework UIKit -framework Foundation -framework QuartzCore -framework Metal \
+    -framework UIKit -framework Foundation -framework QuartzCore -framework CoreGraphics -framework Metal \
     -o "$work/runtime-smoke"
   codesign -f -s - "$work/runtime-smoke"
   # Always launch through simctl, never execute the simulator binary on the host.

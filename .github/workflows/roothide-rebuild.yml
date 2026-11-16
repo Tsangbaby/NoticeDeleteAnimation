@@ -52,6 +52,7 @@ jobs:
           python3 Scripts/source_manifest.py --check
           python3 Scripts/check_source.py 2>&1 | tee build-evidence/source-checks.txt
       - name: Native arm64 and arm64e compile and RootHide package
+        if: success() || failure()
         shell: bash
         run: |
           set -euo pipefail

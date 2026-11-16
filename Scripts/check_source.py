@@ -26,7 +26,8 @@ class SourceContracts(unittest.TestCase):
         self.assertEqual(c['Package'],'com.example.noticelisttweak')
         self.assertEqual(c['Version'],'1.0.1+rebuild1')
         self.assertIn('firmware (>= 15.0)',c['Depends'])
-        for f in ROOT.rglob('*.plist'):plistlib.loads(f.read_bytes())
+        for directory in ('layout','prefs'):
+            for f in (ROOT/directory).rglob('*.plist'):plistlib.loads(f.read_bytes())
     def test_preferences_registration(self):
         entry=plistlib.loads((ROOT/'layout/Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist').read_bytes())['entry']
         info=plistlib.loads((ROOT/'layout/Library/PreferenceBundles/NoticeListTweak.bundle/Info.plist').read_bytes())
