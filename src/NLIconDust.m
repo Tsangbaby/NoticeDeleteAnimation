@@ -134,7 +134,7 @@ static BOOL NLIconHomeMembership(id manager, id icon, BOOL *outIsHome)
         return NO;
     }
 
-    id indexPath = [folder performSelector:indexPathSel withObject:icon];
+    id indexPath = NLABISendObject(folder, indexPathSel, icon);
     if (outIsHome) {
         *outIsHome = (indexPath != nil);
     }
@@ -159,8 +159,8 @@ static id NLFindPendingIcon(id manager, id icon)
     for (id job in NLIconJobs) {
         if ([job respondsToSelector:NSSelectorFromString(@"manager")] &&
             [job respondsToSelector:NSSelectorFromString(@"icon")]) {
-            id jobManager = [job performSelector:NSSelectorFromString(@"manager")];
-            id jobIcon = [job performSelector:NSSelectorFromString(@"icon")];
+            id jobManager = NLABIReadObject(job, NSSelectorFromString(@"manager"));
+            id jobIcon = NLABIReadObject(job, NSSelectorFromString(@"icon"));
             if (jobManager == manager && jobIcon == icon) {
                 return job;
             }
@@ -293,8 +293,7 @@ static BOOL NLIconDustIsEnabled(void)
     // 图标是否还挂在原位置
     BOOL detached = YES;
     if ([self.manager respondsToSelector:NSSelectorFromString(@"firstIconViewForIcon:")]) {
-        id view = [self.manager performSelector:NSSelectorFromString(@"firstIconViewForIcon:")
-                                     withObject:self.icon];
+        id view = NLABISendObject(self.manager, NSSelectorFromString(@"firstIconViewForIcon:"), self.icon);
         if ([view isKindOfClass:[UIView class]]) {
             UIView *iconView = (UIView *)view;
             if (iconView.window && !iconView.isHidden && iconView.alpha >= 0.02) {
@@ -375,8 +374,7 @@ static void NLPrepareIcon(id manager, id icon)
     // 1) 拿到承载图标的 SBIconView
     id iconView = nil;
     if ([manager respondsToSelector:NSSelectorFromString(@"firstIconViewForIcon:")]) {
-        iconView = [manager performSelector:NSSelectorFromString(@"firstIconViewForIcon:")
-                                withObject:icon];
+        iconView = NLABISendObject(manager, NSSelectorFromString(@"firstIconViewForIcon:"), icon);
     }
     Class iconViewClass = NSClassFromString(@"SBIconView");
     if (!iconViewClass || ![iconView isKindOfClass:iconViewClass]) {

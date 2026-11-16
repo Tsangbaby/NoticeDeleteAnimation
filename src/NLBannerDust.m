@@ -13,6 +13,7 @@
 #import "NLPreferences.h"
 #import "NLWithdrawalEffect.h"
 #import "NLDustRenderer.h"
+#import "NLRuntimeABI.h"
 #import "NLNotificationListHooks.h"
 #import "NLStatusProbe.h"
 #import "NLLockScreenDust.h"
@@ -124,14 +125,14 @@ static NSString *NLBannerRequestKey(id request)
 
     SEL idSel = NSSelectorFromString(@"notificationIdentifier");
     if ([request respondsToSelector:idSel]) {
-        id value = [request performSelector:idSel];
+        id value = NLABIReadObject(request, idSel);
         if ([value isKindOfClass:[NSString class]]) {
             identifier = value;
         }
     }
     SEL sectionSel = NSSelectorFromString(@"sectionIdentifier");
     if ([request respondsToSelector:sectionSel]) {
-        id value = [request performSelector:sectionSel];
+        id value = NLABIReadObject(request, sectionSel);
         if ([value isKindOfClass:[NSString class]]) {
             section = value;
         }
@@ -157,7 +158,7 @@ static UIViewController *NLBannerVC(id presentable)
                             @"contentViewController",
                             @"_contentViewController"]) {
         if ([presentable respondsToSelector:NSSelectorFromString(key)]) {
-            id vc = [presentable performSelector:NSSelectorFromString(key)];
+            id vc = NLABIReadObject(presentable, NSSelectorFromString(key));
             if ([vc isKindOfClass:[UIViewController class]]) {
                 return vc;
             }
@@ -175,7 +176,7 @@ static UIViewController *NLBannerFindRequest(id request, UIViewController *contr
         return nil;
     }
     if ([controller respondsToSelector:NSSelectorFromString(@"notificationRequest")]) {
-        id own = [controller performSelector:NSSelectorFromString(@"notificationRequest")];
+        id own = NLABIReadObject(controller, NSSelectorFromString(@"notificationRequest"));
         if (own == request) {
             return controller;
         }
@@ -345,7 +346,7 @@ static UIView *NLBannerCardInController(UIViewController *controller,
     // 1) controller 自己就是承载者
     NSString *ownKey = nil;
     if ([controller respondsToSelector:NSSelectorFromString(@"notificationRequest")]) {
-        id request = [controller performSelector:NSSelectorFromString(@"notificationRequest")];
+        id request = NLABIReadObject(controller, NSSelectorFromString(@"notificationRequest"));
         ownKey = NLBannerRequestKey(request);
     }
     if ([ownKey isEqual:requestKey] && controller.isViewLoaded) {
@@ -366,7 +367,7 @@ static UIView *NLBannerCardInController(UIViewController *controller,
         if (![controller respondsToSelector:NSSelectorFromString(key)]) {
             continue;
         }
-        id candidate = [controller performSelector:NSSelectorFromString(key)];
+        id candidate = NLABIReadObject(controller, NSSelectorFromString(key));
         if (![candidate isKindOfClass:[UIView class]]) {
             continue;
         }
@@ -402,7 +403,7 @@ static NLDisposition NLBannerDisposition(NLWithdrawalEffect *effect)
     // owner（BNContentViewController）已经不在 presentable 栈里 → 原生收回完成
     if (owner) {
         if ([owner respondsToSelector:NSSelectorFromString(@"presentedPresentables")]) {
-            id list = [owner performSelector:NSSelectorFromString(@"presentedPresentables")];
+            id list = NLABIReadObject(owner, NSSelectorFromString(@"presentedPresentables"));
             if ([list isKindOfClass:[NSArray class]]) {
                 if ([list indexOfObjectIdenticalTo:payload] == NSNotFound) {
                     return NLDispositionProceed;
@@ -460,7 +461,7 @@ static void NLBannerDismiss(id self, SEL _cmd, id presentable, id reason,
                                     @"_notificationViewController",
                                     @"contentViewController"]) {
                 if ([presentable respondsToSelector:NSSelectorFromString(key)]) {
-                    id vc = [presentable performSelector:NSSelectorFromString(key)];
+                    id vc = NLABIReadObject(presentable, NSSelectorFromString(key));
                     if ([vc isKindOfClass:[UIViewController class]] && [(UIViewController *)vc isViewLoaded]) {
                         NSUInteger count = 0;
                         card = NLBannerCardInView([(UIViewController *)vc view], 0, &count);

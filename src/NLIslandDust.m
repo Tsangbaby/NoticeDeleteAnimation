@@ -14,6 +14,7 @@
 #import "NLPreferences.h"
 #import "NLWithdrawalEffect.h"
 #import "NLDustRenderer.h"
+#import "NLRuntimeABI.h"
 
 #import <objc/runtime.h>
 #import <substrate.h>
@@ -51,7 +52,7 @@ static void NLOwnedViews(id provider, NSMutableArray *out)
         if (![provider respondsToSelector:sel]) {
             continue;
         }
-        id candidate = [provider performSelector:sel];
+        id candidate = NLABIReadObject(provider, sel);
         if ([candidate isKindOfClass:[UIView class]]) {
             [out addObject:candidate];
         }
@@ -94,7 +95,7 @@ static UIView *NLProviderView(id element, NSUInteger depth, NSHashTable *seen)
         if (![element respondsToSelector:sel]) {
             continue;
         }
-        id provider = [element performSelector:sel];
+        id provider = NLABIReadObject(element, sel);
         UIView *found = NLProviderView(provider, depth + 1, seen);
         if (found) {
             return found;
@@ -208,7 +209,7 @@ static void NLTOCurrent(id self, SEL _cmd, id reason)
     id element = nil;
     SEL currentSel = NSSelectorFromString(@"currentElement");
     if ([self respondsToSelector:currentSel]) {
-        element = [self performSelector:currentSel];
+        element = NLABIReadObject(self, currentSel);
     }
     if (element) {
         NLPrepareIsland(element, self, kNLIslandPrefTrollOpen, NLTOState);
@@ -247,7 +248,7 @@ static void NLAPDismiss(id self, SEL _cmd, BOOL content, BOOL forceKill)
         if (![self respondsToSelector:sel]) {
             continue;
         }
-        id value = [self performSelector:sel];
+        id value = NLABIReadObject(self, sel);
         if ([value isKindOfClass:[NSArray class]]) {
             elements = value;
             break;

@@ -13,8 +13,7 @@ for arch in arm64 arm64e; do
     echo "NATIVE SOURCE: $arch $source"
     xcrun --sdk iphoneos clang -target "$arch-apple-ios15.0" -isysroot "$sdk" \
       -fobjc-arc -fblocks -fsyntax-only -ferror-limit=0 -Wall -Wextra \
-      -Werror=implicit-function-declaration -Werror=incompatible-pointer-types \
-      -Werror=objc-method-access -Wno-deprecated-declarations \
+      -Werror -Wno-unused-parameter -Wno-deprecated-declarations \
       -I "$headers" -I "$THEOS/vendor/include" -F "$THEOS/vendor/lib" \
       -I src -I prefs "$source" || status=1
   done

@@ -35,3 +35,15 @@ static inline BOOL NLABIReadBool(id object, SEL selector) {
     if (!object || !NLABIMethod(object_getClass(object), selector, "B", 0, NULL)) return NO;
     return ((BOOL (*)(id, SEL))[object methodForSelector:selector])(object, selector);
 }
+
+// Dynamic getters in this reconstruction are ordinary +0 object-returning
+// methods (never alloc/new/copy families). Validate their exact call ABI.
+static inline id NLABIReadObject(id object, SEL selector) {
+    if (!object || !NLABIMethod(object_getClass(object), selector, "@", 0, NULL)) return nil;
+    return ((id (*)(id, SEL))[object methodForSelector:selector])(object, selector);
+}
+static inline id NLABISendObject(id object, SEL selector, id argument) {
+    const char *arguments[] = { "@" };
+    if (!object || !NLABIMethod(object_getClass(object), selector, "@", 1, arguments)) return nil;
+    return ((id (*)(id, SEL, id))[object methodForSelector:selector])(object, selector, argument);
+}

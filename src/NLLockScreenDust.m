@@ -100,7 +100,7 @@ static UIView *NLLockCard(id cell)
                             @"shortLookView"]) {
         SEL sel = NSSelectorFromString(key);
         if ([cell respondsToSelector:sel]) {
-            id candidate = [cell performSelector:sel];
+            id candidate = NLABIReadObject(cell, sel);
             if ([candidate isKindOfClass:[UIView class]]) {
                 return candidate;
             }
@@ -109,14 +109,14 @@ static UIView *NLLockCard(id cell)
     // 退一步：notificationRequest → viewController → view
     SEL reqSel = NSSelectorFromString(@"notificationRequest");
     if ([cell respondsToSelector:reqSel]) {
-        id request = [cell performSelector:reqSel];
+        id request = NLABIReadObject(cell, reqSel);
         for (NSString *key in @[@"contentViewController",
                                 @"notificationViewController",
                                 @"_contentViewController",
                                 @"viewController"]) {
             SEL sel = NSSelectorFromString(key);
             if ([request respondsToSelector:sel]) {
-                id vc = [request performSelector:sel];
+                id vc = NLABIReadObject(request, sel);
                 if ([vc isKindOfClass:[UIViewController class]] &&
                     [(UIViewController *)vc isViewLoaded]) {
                     return [(UIViewController *)vc view];

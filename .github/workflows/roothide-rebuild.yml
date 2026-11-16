@@ -71,11 +71,11 @@ jobs:
           set -euo pipefail
           bash Scripts/test_shader_native.sh 2>&1 | tee build-evidence/shader-native-tests.txt
       - name: Real UIKit and Preferences source smoke
-        if: success() || failure()
+        if: success()
         shell: bash
         run: bash Scripts/test_preferences_native.sh
       - name: Real runtime ABI and installer retry smoke
-        if: success() || failure()
+        if: success()
         shell: bash
         run: bash Scripts/test_runtime_native.sh
       - name: Validate actual reconstructed package

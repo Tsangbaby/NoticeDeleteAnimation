@@ -50,6 +50,7 @@ static NSUInteger NLObjectCalls, NLIntegerCalls, NLDoubleCalls, NLExtraCalls;
 - (BOOL)noFlag;
 - (signed char)legacyFlag;
 - (id)objectValue;
+- (id)echoObject:(id)value;
 - (NSInteger)integerState;
 - (double)doubleValue;
 - (BOOL)flagWithExtra:(NSUInteger)value;
@@ -59,6 +60,7 @@ static NSUInteger NLObjectCalls, NLIntegerCalls, NLDoubleCalls, NLExtraCalls;
 - (BOOL)noFlag { ++NLNoCalls; return NO; }
 - (signed char)legacyFlag { ++NLLegacyCalls; return 1; }
 - (id)objectValue { ++NLObjectCalls; return @"object-fixture"; }
+- (id)echoObject:(id)value { ++NLObjectCalls; return value; }
 - (NSInteger)integerState { ++NLIntegerCalls; return -42; }
 - (double)doubleValue { ++NLDoubleCalls; return 13.25; }
 - (BOOL)flagWithExtra:(NSUInteger)value { ++NLExtraCalls; return value != 0; }
@@ -117,6 +119,13 @@ static void NLTestABI(void) {
     CHECK(!NLABIReadBool(probe, @selector(flagWithExtra:)));
     CHECK(NLObjectCalls == 0 && NLIntegerCalls == 0 && NLDoubleCalls == 0 && NLExtraCalls == 0);
     CHECK(NLYesCalls == 1 && NLNoCalls == 1 && NLLegacyCalls == 1);
+    CHECK([NLABIReadObject(probe, @selector(objectValue)) isEqual:@"object-fixture"]);
+    CHECK(NLABISendObject(probe, @selector(echoObject:), probe) == probe);
+    CHECK(NLABIReadObject(probe, @selector(yesFlag)) == nil);
+    CHECK(NLABIReadObject(probe, @selector(doubleValue)) == nil);
+    CHECK(NLABISendObject(probe, @selector(flagWithExtra:), probe) == nil);
+    CHECK(NLABISendObject(probe, @selector(objectValue), probe) == nil);
+    CHECK(NLObjectCalls == 2 && NLExtraCalls == 0 && NLDoubleCalls == 0);
 }
 
 typedef struct {
