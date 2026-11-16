@@ -24,7 +24,7 @@
   "Scripts/test_shader_native.sh": "9d463111c0ab979092791b892b1e4596f49da0cfb0cfc75df4135f66c1cd117c",
   "Scripts/validate_package.py": "4617279ce15a6dd113d933f3ee6fa8d08fac37233a609363790f29db7ff8b491",
   "Tests/BannerRegression/README.md": "7f417475e462ae4e19da47776dcbcb9eed4168df841addec83e26486e8b607c3",
-  "Tests/BannerRegression/main.m": "5fb207a87c909b8b58786c37583c5ec5b05b2c97861d012887e06410d4a67bae",
+  "Tests/BannerRegression/main.m": "72a7d32655a78962f5b7efb11f71133aa13d2989eb3a5c86ed8f36324642d3fc",
   "Tests/BannerRegression/substrate.h": "ea8ff9fd857ae325d7b7277f38203992c3a8e5efc5308207828c72e819563065",
   "Tests/GeometryNative/main.m": "291bf91a91eadfcb11a85e3a84b5ddf9ad504af19af4a6eff1060cc8c688e8b0",
   "Tests/PreferencesSmoke/main.m": "f68d9e7e435d6838aa1dad2b2c63d9c8428fa3908f421125422941a99237a264",

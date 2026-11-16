@@ -233,12 +233,15 @@ static void Run(FixtureBN *bn, FixtureHost *host, UIView *card, Class requestCla
     CHECK(!NLInstallBannerDustHooks()); // class absent
     Class requestClass = Define(@"NCNotificationRequest", [FixtureRequest class]);
     Class cardClass = Define(@"NCNotificationShortLookView", [UIView class]);
-    Class bnClass = Define(@"BNContentViewController", [FixtureBN class]);
     SEL dismiss = @selector(_dismissPresentable:withReason:animated:userInfo:);
-    class_addMethod(bnClass, dismiss, (IMP)WrongDismiss, "Q@:@@B@");
+    Class invalidBase = Define(@"FixtureBNWrongAccessorBase", [FixtureBN class]);
+    CHECK(class_addMethod(invalidBase, dismiss, (IMP)WrongDismiss, "Q@:@@B@"));
+    Class bnClass = Define(@"BNContentViewController", invalidBase);
     CHECK(!NLInstallBannerDustHooks() && hooks == 2); // present/add alone are not installed
     Method original = class_getInstanceMethod([FixtureBN class], dismiss);
-    class_replaceMethod(bnClass, dismiss, method_getImplementation(original), method_getTypeEncoding(original));
+    // Add a correctly typed local override. Replacing an existing local method
+    // changes its IMP, not its old type encoding, and would be an invalid control.
+    CHECK(class_replaceMethod(bnClass, dismiss, method_getImplementation(original), method_getTypeEncoding(original)) == NULL);
     CHECK(NLInstallBannerDustHooks() && hooks == 3);
     CHECK(NLInstallBannerDustHooks() && hooks == 3); // partial repair must not re-hook present/add
     FixtureBN *bn = [bnClass new];
