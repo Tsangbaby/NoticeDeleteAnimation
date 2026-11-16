@@ -14,10 +14,11 @@
 
 // Fixed phase counters only: distinguish a safe native fallback from success.
 static NSUInteger NLListAttempts, NLListNoCard, NLListPrepared, NLListStarted;
+static NSString *NLListLastStage = @"none"; // fixed phase only, never view/request data
 NSDictionary *NLListSnapshotStatus(void) {
     if (![NSThread isMainThread]) return @{};
     return @{ @"attempts":@(NLListAttempts), @"noCard":@(NLListNoCard),
-              @"prepared":@(NLListPrepared), @"started":@(NLListStarted) };
+              @"prepared":@(NLListPrepared), @"started":@(NLListStarted), @"lastStage":NLListLastStage };
 }
 
 // A list accessor returns a row, including swipe actions. Only follow a known,
@@ -127,7 +128,9 @@ static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
     } @finally {
         UIGraphicsEndImageContext();
     }
+    NLListLastStage = @"capture-alpha";
     if (!mask.CGImage || !NLNotificationOpaqueInterior(mask.CGImage)) return nil;
+    NLListLastStage = @"capture-window";
     UIGraphicsBeginImageContextWithOptions(visible.size, NO, 2.0);
     @try {
         CGContextRef context = UIGraphicsGetCurrentContext();
@@ -279,7 +282,9 @@ static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
         return nil;
 
     // --- rasterise the card ------------------------------------------------
+    NLListLastStage = @"capture-mask";
     UIImage *image = NLNotificationCardImage(view, window, viewRect, visible);
+    if (image) NLListLastStage = @"capture-revalidate";
     if (image == nil || image.CGImage == NULL ||
         !NLNotificationCardStillMatches(sourceRow, view, capturedController) || view.window != window ||
         list.window != window || !CGRectEqualToRect(window.bounds, capturedWindowBounds) ||
@@ -298,6 +303,7 @@ static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
     CGRect localRect = CGRectOffset(visible, -cardFrame.origin.x,
                                              -cardFrame.origin.y);            // 0x4c14
 
+    NLListLastStage = @"renderer-create";
     NLDustRenderer *renderer =
         [[NLDustRenderer alloc] initWithImage:image.CGImage                       // 0x4c40
                                    cardFrame:localRect
@@ -325,6 +331,7 @@ static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
     // Completion owns prompt overlay/accounting teardown, not a later watchdog.
     __weak NLNotificationDismissalSnapshot *weakSnapshot = snapshot;
     renderer.completion = ^{ [weakSnapshot cleanUp]; };
+    NLListLastStage = @"renderer-prime";
     BOOL primed = NO;
     @try { primed = [renderer primeFrame]; }
     @catch (NSException *exception) { primed = NO; }
@@ -352,6 +359,7 @@ static UIImage *NLNotificationCardImage(UIView *card, UIWindow *window,
                    withObject:nil
                    afterDelay:NLAnimationDuration + 0.3];                      // 0x4e64..0x4e94
     NLListPrepared = MIN(1000000UL, NLListPrepared + 1);
+    NLListLastStage = @"prepared";
     return snapshot;
 }
 

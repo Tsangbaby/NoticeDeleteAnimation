@@ -226,6 +226,7 @@ static void RendererTests(void) {
 static void CaptureAndLifecycleTests(void) {
     CGRect original = card.frame; CGFloat alpha = card.alpha;
     NLNotificationDismissalSnapshot *s = Snapshot();
+    if (!s) fprintf(stdout, "FIXTURE CAPTURE STAGE: %s\n", [NLListSnapshotStatus() description].UTF8String);
     Check(s != nil, "real UIKit material/card capture produced production snapshot");
     NLDustRenderer *r = s.dustRenderer; RRTexture *t = device.texture;
     Check(t.width == 400 && t.height == 160, "card-only 2x texture excludes sibling swipe actions");

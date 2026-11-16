@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: bash Scripts/test_renderer_native.sh
       - name: Banner request binding and original-dismiss regression
-        if: success()
+        if: success() || failure()
         shell: bash
         run: bash Scripts/test_banner_native.sh
       - name: Validate actual reconstructed package

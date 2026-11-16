@@ -466,7 +466,7 @@ static const NSUInteger NLDustMaxTextureSide __attribute__((unused)) = 0x1000;
     [CATransaction setDisableActions:YES];
     self.hidden = YES;
     [self.layer removeAllAnimations];
-    self.layer.contents = nil;
+    // CAMetalLayer owns drawable presentation; contents is not its teardown API.
     [self removeFromSuperview];
     [CATransaction commit];
     [self.displayLink invalidate];
