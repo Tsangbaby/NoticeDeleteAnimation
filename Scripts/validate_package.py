@@ -97,7 +97,7 @@ def check(deb,extract=None):
     prefs=bundle+'NoticeListTweak'
     entry='Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist'
     allowed={main,main.removesuffix('.dylib')+'.plist',entry,prefs,bundle+'Info.plist',bundle+'Root.plist'}
-    allowed.update(bundle+p for p in ('icon.png','Icon.png','icon@2x.png','icon@3x.png'))
+    allowed.update(bundle+p for p in ('icon.png','Logo.png','icon@2x.png','icon@3x.png'))
     assert set(files)<=allowed,(set(files)-allowed)
     assert {main,prefs,entry,bundle+'Info.plist',bundle+'Root.plist'}<=set(files)
     registration=plistlib.loads(files[entry])['entry'];assert registration['bundle']=='NoticeListTweak' and registration['detail']=='NLRootListController' and registration['isController'] is True

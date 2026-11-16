@@ -18,3 +18,8 @@
 
 ## User testing boundary
 Initial on-device test should compare the same notification-list deletion and ordinary system banner path, with NoticeDeleteAnimation or other overlapping animation tweaks disabled first. Do not use icon uninstallation or third-party island behavior as the first verification step. User installs/resprings; this task does not connect to or modify the device.
+
+## First native evidence / build-host-specific corrections
+- Original resources contained both Icon.png and icon.png with different bytes. macOS case-insensitive checkout conflates them and failed source manifest verification. Neither source/plist references uppercase Icon.png; preserve its bytes as Logo.png, keep registered lowercase icon.png and @2x/@3x unchanged. Manifest now rejects casefold path collisions.
+- The minimal simulator-only Preferences linker declaration initially omitted the _specifiers ivar export. The pinned official iOS16.5 Preferences.tbd was checked and DOES export PSListController._specifiers; add the identical declaration to the simulator link-only stub, not a fake runtime ivar or a settings-model rewrite. The real private runtime remains required by smoke tests.
+- Actual Apple iOS Metal2.1 compiler accepted the unchanged2892B shader in the first CI attempt. No GPU runtime/render/readback claim is made from that result.

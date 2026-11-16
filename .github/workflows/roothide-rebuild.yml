@@ -67,6 +67,10 @@ jobs:
         if: success() || failure()
         shell: bash
         run: bash Scripts/test_preferences_native.sh
+      - name: Real runtime ABI and installer retry smoke
+        if: success() || failure()
+        shell: bash
+        run: bash Scripts/test_runtime_native.sh
       - name: Validate actual reconstructed package
         shell: bash
         run: |

@@ -55,6 +55,7 @@ install-name: /System/Library/PrivateFrameworks/Preferences.framework/Preference
 exports:
   - targets: [ arm64-ios-simulator, x86_64-ios-simulator ]
     objc-classes: [ PSListController, PSSpecifier ]
+    objc-ivars: [ PSListController._specifiers ]
 ...
 TBD
   local flags=(-target "$arch-apple-ios15.0-simulator" -isysroot "$sdk" -fobjc-arc -Werror=objc-method-access -Wno-deprecated-declarations -I "$headers" -I prefs -F "$work/link")
