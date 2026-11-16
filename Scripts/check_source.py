@@ -28,6 +28,9 @@ class SourceContracts(unittest.TestCase):
         self.assertIn('firmware (>= 15.0)',c['Depends'])
         for directory in ('layout','prefs'):
             for f in (ROOT/directory).rglob('*.plist'):plistlib.loads(f.read_bytes())
+        stage_filter=(ROOT/'NoticeListTweak.plist').read_bytes()
+        self.assertEqual(stage_filter,(ROOT/'layout/Library/MobileSubstrate/DynamicLibraries/NoticeListTweak.plist').read_bytes())
+        self.assertEqual(plistlib.loads(stage_filter),{'Filter':{'Bundles':['com.apple.springboard']}})
     def test_preferences_registration(self):
         entry=plistlib.loads((ROOT/'layout/Library/PreferenceLoader/Preferences/com.example.noticelisttweak.plist').read_bytes())['entry']
         info=plistlib.loads((ROOT/'layout/Library/PreferenceBundles/NoticeListTweak.bundle/Info.plist').read_bytes())
